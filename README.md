@@ -92,18 +92,23 @@ end
 
 | API | 说明 |
 |---|---|
-| `ui.clear(color)` | 整屏填充 |
-| `ui.rect(x, y, w, h, color)` | 左上角坐标 |
-| `ui.circle(cx, cy, r, color)` / `ui.ring(cx, cy, r, thick, color)` | |
-| `ui.line(x0, y0, x1, y1, thick, color)` | |
-| `ui.text(s, x, y, size, color)` | 居中；`size` 目前两档：<60 用 29px，≥60 用 106px（只含数字和冒号） |
-| `time.now()` | 返回 `{year, month, day, hour, min, sec, wday}` |
-| `app.get(key)` | 读插件设置（网页「插件详情」里填的值） |
-| `http.get(url, cb)` | 异步 GET；回调 `cb(status, body)` 在绘制线程里执行 |
-| `json.decode(str)` | JSON → Lua table |
-| `log(...)` | 打到串口 |
+| `ui.clear(color)` / `ui.bg(name)` | 整屏填充 / 画天气背景 |
+| `ui.rect` `ui.round_rect` `ui.circle` `ui.ring` `ui.arc` `ui.line` | 图元，坐标为像素 |
+| `ui.text(s, x, y, size, color)` | 居中绘制；`size` 分四档（106/56/29/22px） |
+| `ui.measure(s, size)` | 量文字宽度，排版用 |
+| `ui.icon(name, size, cx, cy)` | 画内置天气图标（120/64） |
+| `time.now()` / `time.epoch()` | 本地时间表 / unix 秒 |
+| `app.get(key)` | 读插件设置 |
+| `http.get(url, cb)` | 异步 GET，`cb(status, body)`，同 URL 2 分钟内走缓存 |
+| `json.decode(s)` | JSON → 表 |
+| `net.up()` | WiFi 是否已连上（发请求前先判断） |
+| `store.get/set(key, val)` | 插件自己的持久化键值（存卡上） |
+| `log(s)` | 打到串口 |
 
-颜色是 `0xRRGGBB`。可选 `on_start()` 在加载后调用一次。
+颜色是 `0xRRGGBB`，要半透明就写 `0xAARRGGBB`。可选 `on_start()` 在每次进屏时调用一次。
+
+> 完整的 API 说明、字号能画什么字、内存与指令限制、调试方法，见
+> **[docs/plugin-guide.md](docs/plugin-guide.md)**。
 
 ### 插件设置
 
@@ -112,11 +117,12 @@ manifest 里用 `settings` 描述表单，网页会自动生成控件：
 ```json
 "settings": [
   {"key": "lat", "label": "纬度", "type": "number", "default": "22.54"},
-  {"key": "unit", "label": "单位", "type": "select", "options": ["c", "f"], "default": "c"}
+  {"key": "unit", "label": "单位", "type": "select", "options": ["c", "f"], "default": "c"},
+  {"key": "bg",  "label": "背景色", "type": "color", "default": "#0F1115"}
 ]
 ```
 
-`type` 支持 `text` / `number` / `select`。值存在 `/sdcard/plugins/<id>/settings.json`，
+`type` 支持 `text` / `number` / `select` / `color`。值存在 `/sdcard/plugins/<id>/settings.json`，
 插件里用 `app.get("lat")` 读；网页点插件名字就能改，保存后插件会自动重载。
 
 ### 示例插件：时钟
@@ -341,34 +347,117 @@ I (xxx) mochi: ========== Mochi 0.1 ==========
 
 ---
 
+## 关于这个项目
+
+### 想做什么
+
+AWTRIX 证明了「一块小屏 + 几个像素动画」放在桌上是会让人心情变好的东西。我想做一个更像「宠物」的版本：
+
+- **它有自己的状态**，不是循环播放的 GIF。余额在掉说明你在干活，它就打字；一阵没动静它就吃饭；一小时没动静就睡觉。
+- **它是可扩展的**。今天想做天气，明天想做番茄钟，不应该为此重新刷固件。
+- **它自己活着**。开机能连 WiFi、能对时、能在网页上配置，不需要一台常开的电脑伺候它。
+
+### 为什么不用 LVGL
+
+这个项目的画面本质上只有几类东西：纯色块、圆、线、文字。LVGL 能画，但它带来的对象树、样式系统、
+内存池在 480×480 RGB565 + PSRAM 帧缓冲这个场景里是纯开销——渲染一帧要遍历对象树、算脏区、再逐层合成。
+
+所以我写了一个 ~450 行的扫描线渲染器（`gfx.c`）：每个图元直接往帧缓冲的 span 上写，
+距离场做抗锯齿。整屏填充 450KB 大约 18ms（PSRAM 带宽瓶颈），全套 3 个图元 + 文字能跑到 43fps（面板上限）。
+
+代价是没有现成的控件库，按钮、列表、滚动都要自己画——但这也正好符合「一块表盘」的需求。
+
+### 几个关键取舍
+
+| 决定 | 原因 |
+|---|---|
+| **素材全放 TF 卡** | 8MB PSRAM 里要放 3 块帧缓冲（1.35MB）+ 视频环形缓冲（576KB）+ Lua 堆，素材塞 flash 会把 OTA 分区挤爆 |
+| **视频用 MJPEG 而不是 GIF** | 用芯片自带的 JPEG 解码器（SIMD）解 480×480 单帧约 10ms，GIF 的 LZW 是纯软件解码且只有 256 色 |
+| **插件用 Lua 而不是 C** | 插件是用户写的，不该让他为了加个时钟去学 ESP-IDF、配工具链。Lua 5.4 加 192KB 堆上限 + 单帧指令预算，跑飞了只会显示错误屏，不会拖垮整机 |
+| **插件即应用** | 没有「插件容器」这一层概念：一个插件就是一块屏幕，摇一摇轮换，和内置的桌宠、网络平级 |
+| **素材下发走 assets 分区** | 电脑不能直接写卡，所以素材先烧进 flash 分区，设备开机自己拷到卡上，拷完把分区擦掉——既不用读卡器，也不长期占闪存 |
+
+### 技术栈
+
+| 层 | 用了什么 |
+|---|---|
+| 芯片 | ESP32-S3（双核 240MHz，8MB PSRAM，16MB flash） |
+| 框架 | ESP-IDF v5.5.2 |
+| 屏幕 | ST7701S 480×480 RGB 面板 + 3 块 PSRAM 帧缓冲 |
+| 图形 | 自己写的 SDF 扫描线渲染器（`gfx.c`） |
+| 视频 | esp_new_jpeg（SIMD 解码）+ 自研 MJP1 容器 |
+| 脚本 | Lua 5.4.7（32 位数值，跑在独立状态机里） |
+| 网络 | lwIP + esp_http_server + mbedTLS 证书链 |
+| 数据 | Open-Meteo（天气）、DeepSeek（余额） |
+
+### 致谢
+
+- [Lua](https://www.lua.org/) —— MIT
+- [esp_new_jpeg](https://github.com/espressif/esp-adf-libs) —— Apache-2.0
+- [Meteocons](https://meteocons.com/) —— MIT，天气图标和背景
+- [AWTRIX](https://github.com/Blueforcer/awtrix3) —— 灵感来源
+
+---
+
 ## 目录
 
 ```
 mochi/
-├─ firmware/                  ESP-IDF 工程
+├─ firmware/
 │  ├─ main/
-│  │  ├─ gfx.c                SDF 抗锯齿渲染器（480×480 RGB565）
-│  │  ├─ app_face.c           表情（程序化绘制）
-│  │  ├─ app_clock.c          时钟（刻度环 + 秒游标 + 大字）
-│  │  ├─ apps.c               应用管理与淡入淡出
-│  │  ├─ imu.c                QMI8658 + 手势识别
-│  │  ├─ rtc.c                PCF85063 + 编译时刻兜底
-│  │  ├─ lcd.c / io.c         屏幕与 IO 扩展（复用自已验证的驱动）
-│  │  └─ fonts.c              字体图集（自动生成）
-│  ├─ partitions.csv
-│  └─ sdkconfig.defaults
+│  │  ├─ main.c            启动顺序、主循环、串口命令
+│  │  ├─ gfx.c / gfx.h     SDF 抗锯齿渲染器（480×480 RGB565）
+│  │  ├─ fonts.c           字体图集（tools/gen_font.py 生成）
+│  │  ├─ apps.c            应用/插件槽位管理、淡入淡出、启用过滤
+│  │  ├─ app_pet.c         桌宠：MJPEG 流式播放 + 三段动画切换 + 余额 HUD
+│  │  ├─ app_net.c         网络屏（IP / 热点提示）
+│  │  ├─ builtin_apps.c    内置插件（网络、桌宠）的 manifest 注册表
+│  │  ├─ builtin_plugins.c 卡上示例插件（时钟、天气）的源码与自动安装
+│  │  ├─ lua_rt.c          Lua 运行时：沙箱、ui/time/http/json/store API
+│  │  ├─ plugins.c         插件扫描、启用/停用（NVS 停用名单）
+│  │  ├─ plugin_conf.c     插件设置（settings.json）
+│  │  ├─ icons.c           天气图标包读取 + alpha 贴图（4 槽 LRU 缓存）
+│  │  ├─ bg.c              天气背景解码缓存 + 整帧拷贝
+│  │  ├─ assets.c          assets 分区 → TF 卡同步（写完擦除分区）
+│  │  ├─ dsec.c            DeepSeek 余额/今日消耗/峰谷 + 桌宠状态机
+│  │  ├─ net.c             AP+STA、WiFi 扫描、SNTP、断线重连
+│  │  ├─ web.c             HTTP 服务与全部 API
+│  │  ├─ www.h             内嵌网页（gzip，tools/build_www.py 生成）
+│  │  ├─ lcd.c / io.c      屏幕与 IO 扩展（ST7701S / TCA9554）
+│  │  ├─ imu.c             QMI8658 + 手势识别（摇一摇/翻转）
+│  │  ├─ rtc.c             PCF85063 + 编译时刻兜底
+│  │  └─ sd.c              SDMMC 1-bit 挂载与写重试
+│  ├─ components/
+│  │  ├─ lua/              随仓库携带的 Lua 5.4.7
+│  │  └─ esp_new_jpeg/     预编译 JPEG 解码器（只保留 esp32s3）
+│  ├─ assets/              pet/work/sleep.mjp、icons.bin、bg.bin
+│  └─ partitions.csv
 ├─ tools/
-│  ├─ preview.py              视觉预览（设计用，不参与构建）
-│  └─ gen_font.py             TTF → 固件字体
-└─ docs/architecture.md       平台/插件/网页设计
+│  ├─ gen_font.py          TTF → 固件字体（ASCII + 中文白名单）
+│  ├─ pack_dir.py          目录里的 PNG 序列 → MJP1
+│  ├─ pack_clip.py         zip 里的帧序列 → MJP1
+│  ├─ pack_assets.py       多个素材 → assets.bin
+│  ├─ pack_icons.py        图标包（RGB565+A8）
+│  ├─ pack_bg.py           天气背景包（JPEG）
+│  ├─ build_www.py         网页 → gzip → www.h
+│  ├─ preview.py           预览图渲染（设计用，不参与构建）
+│  └─ capture.py           串口 ASCII 截图（调试用）
+├─ webui/index.html        网页后台源码
+├─ weather-bg*/            天气背景源图
+└─ docs/                   使用手册 / 插件指南 / 设计 / 验证记录
 ```
 
 ---
 
-## 已知限制（M1）
+## 已知限制
 
-- 外发光暂时关闭（逐像素半透明 45ms/帧），后续用预渲染纹理补回。
-- 整屏重绘受 PSRAM 带宽限制（~30MB/s，450KB/帧），当前 ~35fps，细节见 [docs/verification.md](docs/verification.md)。
-- 没有联网：时间来自 RTC 或编译时刻；NTP/网页配网在 M2。
-- 中文字符集只有 138 个（日期、星期和少量提示语），M2 再扩。
+- **整屏重绘受 PSRAM 带宽限制**：填 450KB 约 18ms，所以 Lua 插件一帧只有 5ms 左右留给内容绘制，
+  画太满会掉帧（桌宠那屏 41ms/帧，基本吃满）。
+- **中文字表是白名单**：现在约 200 字（时间词、天气词、20 个城市名），不在表里的字显示成空白，
+  要加字得改 `tools/gen_font.py` 重新生成字体。
+- **今日消耗是估算**：官方没有用量接口，按余额下降累加；关机期间「又花钱又充值」的差额算不出来。
+- **法定节假日没日历**：峰谷按工作日算，节假日当天会误判成峰时。
+- **插件不能写文件**：没有 `io`/`os`，持久化只能用 `store`（键值字符串）。
+- **素材更新要整包重烧**：assets 分区是一次性分发通道，改一张图也要重新 `idf.py flash`。
+- **OTA 不校验签名**：目前只校验镜像有效性，没有做安全启动。`
 - `tools/preview.py` 是独立实现（Pillow），只用来定视觉；像素级以 `gfx.c` 为准。
