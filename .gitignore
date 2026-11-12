@@ -28,3 +28,6 @@ Thumbs.db
 
 # é¢„è§ˆä¸´æ—¶å›¾
 preview/_*
+
+# ·¢²¼µÄ¹Ì¼þ°ü£¨Ìå»ý´ó£¬·Å GitHub Release£©
+release/*.bin

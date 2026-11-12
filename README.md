@@ -32,6 +32,15 @@ manifest 描述设置项 → 网页自动生成表单 → 保存到 TF 卡 → L
 
 ## 快速开始
 
+**不想编译？** 去 [Releases](https://github.com/z464244404/mochi/releases) 下 `mochi-1.0.0-full.bin`，
+一条命令刷进去（含 bootloader、分区表、固件、素材）：
+
+```bash
+esptool --chip esp32s3 -p COM10 write_flash 0x0 mochi-1.0.0-full.bin
+```
+
+从源码编译：
+
 ```bash
 # 1. 装 ESP-IDF v5.5.x
 # 2. 生成素材包（仓库里不含 assets.bin，它是从下面这些源生成出来的）
@@ -57,9 +66,11 @@ idf.py -p COM10 flash monitor
 |---|---|
 | [docs/user-guide.md](docs/user-guide.md) | **怎么用**：屏幕、手势、网页后台、WiFi、插件装/删/设置、OTA |
 | [docs/plugin-guide.md](docs/plugin-guide.md) | **怎么写插件**：目录结构、manifest、完整 Lua API、示例、调试与限制 |
+| [docs/api.md](docs/api.md) | **HTTP API**：所有接口的参数、返回示例、curl 用法 |
+| [docs/hardware.md](docs/hardware.md) | **硬件**：引脚表、I2C 地址、IO 扩展、TF 卡接法、内存分布 |
 | [docs/architecture.md](docs/architecture.md) | 系统设计：渲染、内存布局、素材管线、双核分工 |
 | [docs/verification.md](docs/verification.md) | 实机验证记录：每一步的串口日志、踩过的坑和修法 |
-| [docs/screenshots.md](docs/screenshots.md) | 怎么抓真机截图（现在仓库里的是渲染预览） |
+| [docs/screenshots.md](docs/screenshots.md) | 截图怎么来的（实拍 + 渲染预览） |
 
 ---
 
