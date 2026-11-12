@@ -1,0 +1,359 @@
+<!doctype html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Mochi</title>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 20px; font: 15px/1.5 -apple-system, "Segoe UI", sans-serif;
+    background: #0b0d12; color: #e6edf3; max-width: 720px; margin: 0 auto;
+  }
+  h1 { font-size: 20px; margin: 4px 0 16px; letter-spacing: .5px; }
+  h1 span { color: #5be0bd; }
+  h2 { font-size: 13px; text-transform: uppercase; letter-spacing: 1px;
+       color: #7e8a99; margin: 24px 0 8px; }
+  .card { background: #141821; border: 1px solid #1f2533; border-radius: 12px;
+          padding: 14px 16px; }
+  .row { display: flex; justify-content: space-between; padding: 3px 0; }
+  .row span:first-child { color: #7e8a99; }
+  .app { display: flex; align-items: center; gap: 10px; padding: 10px 0;
+         border-bottom: 1px solid #1a1f2b; }
+  .app:last-child { border-bottom: 0; }
+  .app .name { flex: 1; }
+  .app .meta { color: #5c6675; font-size: 12px; }
+  .badge { font-size: 11px; padding: 2px 8px; border-radius: 99px;
+           background: #17362e; color: #5be0bd; }
+  button {
+    background: #1c2331; color: #e6edf3; border: 1px solid #2a3242;
+    border-radius: 9px; padding: 9px 14px; font-size: 14px; cursor: pointer;
+  }
+  button:hover { background: #232c3d; }
+  button.primary { background: #1e6b57; border-color: #2a8f74; }
+  button.danger { background: #3a1c22; border-color: #5a2a33; color: #ff9aa8; }
+  input[type=text], input[type=password], input[type=number], select {
+    background: #0e1219; border: 1px solid #232b3a; border-radius: 9px;
+    color: #e6edf3; padding: 9px 11px; font-size: 14px; width: 100%;
+  }
+  .fld { display: block; margin: 12px 0; }
+  .fld > span { display: block; color: #7e8a99; font-size: 12px; margin-bottom: 5px; }
+  input[type=color] { width: 100%; height: 42px; padding: 3px; background: #0e1219;
+                      border: 1px solid #232b3a; border-radius: 9px; }
+  .detail-head { display: flex; align-items: baseline; gap: 10px; margin-bottom: 4px; }
+  .detail-head .meta { color: #5c6675; font-size: 12px; }
+  .kvs { color: #8a95a5; font-size: 13px; }
+  .app .name { cursor: pointer; }
+  .app.off { opacity: 0.42; }
+  .app .sw input { width: 18px; height: 18px; accent-color: #5be0bd; }
+  .grid { display: grid; gap: 8px; grid-template-columns: 1fr 1fr; }
+  .row-btns { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+  .hint { color: #5c6675; font-size: 12px; margin-top: 8px; }
+  .nets { margin-top: 10px; max-height: 220px; overflow-y: auto; }
+  .net { display: flex; justify-content: space-between; padding: 9px 10px;
+         border-radius: 8px; cursor: pointer; }
+  .net:hover { background: #1b2230; }
+  .net .rssi { color: #5c6675; font-size: 12px; }
+  #toast { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%);
+           background: #1e6b57; color: #fff; padding: 10px 18px; border-radius: 99px;
+           opacity: 0; transition: opacity .2s; pointer-events: none; }
+  #toast.show { opacity: 1; }
+</style>
+</head>
+<body>
+<h1>Mochi <span>·</span> 桌面摆件</h1>
+
+<div class="card">
+  <div class="row"><span>应用</span><span id="app">-</span></div>
+  <div class="row"><span>帧率</span><span id="fps">-</span></div>
+  <div class="row"><span>内存</span><span id="mem">-</span></div>
+  <div class="row"><span>热点</span><span id="ssid">-</span></div>
+  <div class="row"><span>热点地址</span><span id="apip">-</span></div>
+  <div class="row"><span>局域网</span><span id="staip">-</span></div>
+</div>
+
+<h2>插件</h2>
+<div class="card" id="apps"><div class="hint">读取中…</div></div>
+
+<h2>插件详情</h2>
+<div class="card" id="detail"><div class="hint">点上面插件名字查看详情和设置</div></div>
+
+<h2>示例插件</h2>
+<div class="card" id="builtin"><div class="hint">读取中…</div></div>
+
+<h2>安装 / 更新插件</h2>
+<div class="card">
+  <input type="file" id="files" multiple>
+  <div class="row-btns"><button class="primary" onclick="install()">上传并安装</button></div>
+  <div class="hint">选 manifest.json + main.lua（可多选）。manifest 里的 id 决定装到哪个目录。</div>
+</div>
+
+<h2>控制</h2>
+<div class="card">
+  <div class="row-btns">
+    <button onclick="gesture('prev')">上一个</button>
+    <button onclick="gesture('next')">下一个</button>
+    <button onclick="gesture('tap')">轻敲</button>
+    <button onclick="gesture('shake')">摇一摇</button>
+  </div>
+</div>
+
+<h2>WiFi</h2>
+<div class="card">
+  <div class="row"><span>状态</span><span id="stastate">-</span></div>
+  <div class="row-btns"><button onclick="scan()">扫描附近 WiFi</button></div>
+  <div id="nets" class="nets"></div>
+  <div class="grid" style="margin-top:10px">
+    <input type="text" id="wifi-ssid" placeholder="WiFi 名称（只支持 2.4G）">
+    <input type="password" id="wifi-pass" placeholder="密码">
+  </div>
+  <div class="row-btns"><button class="primary" onclick="saveWifi()">连接</button></div>
+  <div class="hint" id="wifihint">连上后会自动对时，屏幕和状态栏都会显示路由器分配的 IP。</div>
+</div>
+
+<h2>固件</h2>
+<div class="card">
+  <input type="file" id="fw">
+  <div class="row-btns"><button class="danger" onclick="ota()">上传固件并重启</button></div>
+</div>
+
+<div id="toast"></div>
+<script>
+const $ = s => document.querySelector(s);
+let toastTimer;
+function toast(msg) {
+  const t = $('#toast');
+  t.textContent = msg; t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('show'), 1800);
+}
+async function api(path, opts) {
+  const r = await fetch(path, opts);
+  if (!r.ok) throw new Error(await r.text() || r.status);
+  return r.status === 204 ? {} : r.json().catch(() => ({}));
+}
+function reasonHint(code) {
+  switch (code) {
+    case 15: case 204: case 205: return '密码错误或加密方式不支持（reason ' + code + '）';
+    case 201: return '没找到该 WiFi，确认是 2.4G 且名称没打错（reason 201）';
+    case 202: return '认证失败（reason 202）';
+    case 203: return '关联失败，可能信号太弱（reason 203）';
+    case 2: case 3: return '认证/关联超时（reason ' + code + '）';
+    case 200: return '信标丢失，信号太弱（reason 200）';
+    case 0: return '未连接';
+    default: return '连接失败（reason ' + code + '）';
+  }
+}
+function stateText(s) {
+  if (s.sta_state === 'connected') return '已连接 ' + (s.sta_ssid || '') + ' · ' + s.sta_rssi + ' dBm';
+  if (s.sta_state === 'connecting') return '连接中…';
+  if (s.sta_state === 'failed') return reasonHint(s.sta_reason);
+  return '未配置';
+}
+async function refresh() {
+  try {
+    const s = await api('/api/status');
+    $('#app').textContent = s.app;
+    $('#fps').textContent = (s.fps || 0).toFixed(1) + ' fps';
+    $('#mem').textContent = Math.round(s.psram / 1048576) + ' MB PSRAM';
+    $('#ssid').textContent = s.ssid;
+    $('#apip').textContent = 'http://' + s.ip;
+    $('#staip').textContent = s.sta_ip ? 'http://' + s.sta_ip : '未连接';
+    $('#stastate').textContent = stateText(s);
+    const a = await api('/api/apps');
+    const box = $('#apps');
+    if (!a.apps.length) {
+      box.innerHTML = '<div class="hint">还没有插件，选文件上传一个吧。</div>';
+    } else {
+      box.innerHTML = a.apps.map(p => `
+        <div class="app${p.enabled ? '' : ' off'}">
+          <div class="name" onclick="openApp('${p.id}')">${p.name}
+            <div class="meta">${p.id}${p.version ? ' · v' + p.version : ''}${p.kind === 'builtin' ? ' · 内置' : ''}</div></div>
+          <label class="sw" title="启用 / 停用"><input type="checkbox" ${p.enabled ? 'checked' : ''}
+            onchange="toggleApp('${p.id}', this.checked)"></label>
+          ${p.kind === 'lua' ? `<button class="danger" onclick="removeApp('${p.id}')">删除</button>` : ''}
+        </div>`).join('');
+    }
+  } catch (e) { /* 设备忙，下一次再刷 */ }
+}
+const esc = s => String(s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
+let currentApp = null;
+
+async function openApp(id) {
+  currentApp = id;
+  const box = $('#detail');
+  box.innerHTML = '<div class="hint">读取中…</div>';
+  try {
+    const m = await api('/api/app?id=' + encodeURIComponent(id));
+    const schema = Array.isArray(m.settings) ? m.settings : [];
+    const vals = m.values || {};
+    const fields = schema.map(f => {
+      const v = (vals[f.key] !== undefined) ? vals[f.key]
+                : (f.default !== undefined ? f.default : '');
+      const label = esc(f.label || f.key);
+      if (f.type === 'select' && Array.isArray(f.options)) {
+        const opts = f.options.map(o =>
+          `<option value="${esc(o)}" ${String(v) === String(o) ? 'selected' : ''}>${esc(o)}</option>`
+        ).join('');
+        return `<label class="fld"><span>${label}</span><select data-k="${esc(f.key)}">${opts}</select></label>`;
+      }
+      if (f.type === 'color') {
+        const cv = /^#[0-9a-fA-F]{6}$/.test(String(v)) ? String(v) : '#000000';
+        return `<label class="fld"><span>${label}</span>` +
+               `<input data-k="${esc(f.key)}" type="color" value="${cv}"></label>`;
+      }
+      const t = f.type === 'number' ? 'number' : 'text';
+      return `<label class="fld"><span>${label}</span>` +
+             `<input data-k="${esc(f.key)}" type="${t}" value="${esc(v)}"></label>`;
+    }).join('');
+
+    box.innerHTML = `
+      <div class="detail-head"><strong>${esc(m.name || id)}</strong>
+        <span class="meta">${esc(id)}${m.version ? ' · v' + esc(m.version) : ''}` +
+        `${m.author ? ' · ' + esc(m.author) : ''}</span></div>
+      ${schema.length
+        ? fields + '<div class="row-btns"><button class="primary" onclick="saveSettings()">保存设置</button></div>'
+        : '<div class="hint">这个插件没有可配置项。</div>'}`;
+  } catch (e) {
+    box.innerHTML = '<div class="hint">读取失败</div>';
+  }
+}
+
+async function toggleApp(id, on) {
+  await api(`/api/app/enable?id=${encodeURIComponent(id)}&on=${on ? 1 : 0}`, { method: 'POST' });
+  toast(on ? '已启用 ' + id : '已停用 ' + id);
+  refresh();
+}
+
+async function saveSettings() {
+  if (!currentApp) return;
+  const obj = {};
+  const id = currentApp;
+  $('#detail').querySelectorAll('[data-k]').forEach(el => {
+    obj[el.dataset.k] = el.value;
+    if (el.type === 'checkbox') obj[el.dataset.k] = el.checked ? 'on' : 'off';
+  });
+  const r = await api('/api/app/settings?id=' + encodeURIComponent(id), {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(obj)
+  });
+  toast(r.ok ? `已保存 ${r.bytes} 字节，立即生效` : '保存失败');
+  openApp(id); /* 回显已落盘的值 */
+}
+
+async function loadBuiltin() {
+  try {
+    const b = await api('/api/builtin');
+    $('#builtin').innerHTML = b.plugins.map(p => `
+      <div class="app"><div class="name">${esc(p.name)}<div class="meta">${esc(p.id)}</div></div>
+      <button onclick="installBuiltin('${p.id}')">${p.installed ? '重新安装' : '安装'}</button></div>`
+    ).join('') || '<div class="hint">没有内置示例</div>';
+  } catch (e) {
+    $('#builtin').innerHTML = '<div class="hint">读取失败</div>';
+  }
+}
+
+async function installBuiltin(id) {
+  await api('/api/builtin/install?id=' + encodeURIComponent(id), { method: 'POST' });
+  toast('已安装 ' + id);
+  loadBuiltin();
+  refresh();
+}
+
+async function activate(id) {  await api('/api/active?id=' + encodeURIComponent(id), { method: 'POST' });
+  toast('已切换到 ' + id); refresh();
+}
+async function removeApp(id) {
+  if (!confirm('删除插件 ' + id + '？')) return;
+  await api('/api/app?id=' + encodeURIComponent(id), { method: 'DELETE' });
+  toast('已删除'); refresh();
+}
+async function install() {
+  const files = [...$('#files').files];
+  if (!files.length) return toast('先选文件');
+  const mf = files.find(f => f.name === 'manifest.json');
+  if (!mf) return toast('缺少 manifest.json');
+  let id;
+  try { id = JSON.parse(await mf.text()).id; } catch (e) { return toast('manifest 不是合法 JSON'); }
+  if (!id) return toast('manifest 缺少 id');
+  for (const f of files) {
+    await fetch(`/api/upload?id=${encodeURIComponent(id)}&file=${encodeURIComponent(f.name)}`,
+                { method: 'POST', body: f });
+  }
+  await api('/api/install?id=' + encodeURIComponent(id), { method: 'POST' });
+  toast('已安装 ' + id); refresh();
+}
+async function gesture(ev) {
+  await api('/api/gesture?event=' + ev, { method: 'POST' });
+  setTimeout(refresh, 400);
+}
+async function scan() {
+  const box = $('#nets');
+  box.textContent = '扫描中…（约 3 秒，热点可能会短暂卡顿）';
+  try {
+    const r = await api('/api/scan');
+    box.innerHTML = '';
+    if (!r.networks || !r.networks.length) {
+      box.textContent = '没扫到网络，靠近路由器再试一次';
+      return;
+    }
+    r.networks.forEach(n => {
+      const row = document.createElement('div');
+      row.className = 'net';
+      const name = document.createElement('span');
+      name.textContent = n.ssid;
+      const sig = document.createElement('span');
+      sig.className = 'rssi';
+      sig.textContent = n.rssi + ' dBm';
+      row.appendChild(name);
+      row.appendChild(sig);
+      row.onclick = () => {
+        $('#wifi-ssid').value = n.ssid;
+        $('#wifihint').textContent = '已选择 ' + n.ssid + '，输入密码后点连接';
+      };
+      box.appendChild(row);
+    });
+  } catch (e) {
+    box.textContent = '扫描失败，重试一次';
+  }
+}
+async function saveWifi() {
+  const ssid = $('#wifi-ssid').value.trim(), pass = $('#wifi-pass').value;
+  if (!ssid) return toast('填 WiFi 名称');
+  await api(`/api/wifi?ssid=${encodeURIComponent(ssid)}&pass=${encodeURIComponent(pass)}`,
+            { method: 'POST' });
+  toast('已保存，正在连接…');
+  $('#wifihint').textContent = '正在连接 ' + ssid + ' …';
+  let tries = 0;
+  const timer = setInterval(async () => {
+    tries++;
+    try {
+      const s = await api('/api/status');
+      $('#stastate').textContent = stateText(s);
+      if (s.sta_state === 'connected') {
+        clearInterval(timer);
+        $('#wifihint').textContent = '已连上，局域网地址 http://' + s.sta_ip;
+        toast('已连接 ' + s.sta_ip);
+        refresh();
+      } else if (s.sta_state === 'failed' && tries >= 3) {
+        clearInterval(timer);
+        $('#wifihint').textContent = reasonHint(s.sta_reason);
+        toast('连接失败');
+      }
+    } catch (e) { /* 忽略，下一轮再试 */ }
+    if (tries > 25) clearInterval(timer);
+  }, 1000);
+}
+async function ota() {
+  const f = $('#fw').files[0];
+  if (!f) return toast('先选 .bin');
+  toast('上传中，别断电…');
+  await fetch('/api/ota', { method: 'POST', body: f });
+  toast('完成，设备重启中');
+}
+refresh();
+loadBuiltin();
+setInterval(refresh, 2500);
+</script>
+</body>
+</html>

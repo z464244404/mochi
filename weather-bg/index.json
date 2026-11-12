@@ -1,0 +1,130 @@
+{
+ "clear-day": {
+  "zh": "晴",
+  "codes": "0 / 1",
+  "palette": "light",
+  "alt": false,
+  "mean": 164.0,
+  "p95": 196.7
+ },
+ "clear-day-dark": {
+  "zh": "晴（深色备选）",
+  "codes": "0 / 1",
+  "palette": "dark",
+  "alt": true,
+  "mean": 37.2,
+  "p95": 94.8
+ },
+ "clear-night": {
+  "zh": "晴（夜间）",
+  "codes": "0 / 1 · 夜",
+  "palette": "dark",
+  "alt": false,
+  "mean": 26.0,
+  "p95": 52.6
+ },
+ "partly-cloudy-day": {
+  "zh": "多云",
+  "codes": "2",
+  "palette": "light",
+  "alt": false,
+  "mean": 165.0,
+  "p95": 218.3
+ },
+ "partly-cloudy-day-dark": {
+  "zh": "多云（深色备选）",
+  "codes": "2",
+  "palette": "dark",
+  "alt": true,
+  "mean": 32.5,
+  "p95": 89.8
+ },
+ "partly-cloudy-night": {
+  "zh": "多云（夜间）",
+  "codes": "2 · 夜",
+  "palette": "dark",
+  "alt": false,
+  "mean": 23.5,
+  "p95": 59.5
+ },
+ "cloudy": {
+  "zh": "阴",
+  "codes": "3",
+  "palette": "dark",
+  "alt": false,
+  "mean": 41.4,
+  "p95": 106.9
+ },
+ "fog": {
+  "zh": "雾",
+  "codes": "45 / 48",
+  "palette": "dark",
+  "alt": false,
+  "mean": 41.0,
+  "p95": 69.2
+ },
+ "drizzle": {
+  "zh": "毛毛雨",
+  "codes": "51 / 53 / 55",
+  "palette": "dark",
+  "alt": false,
+  "mean": 33.9,
+  "p95": 81.2
+ },
+ "rain": {
+  "zh": "雨",
+  "codes": "61 / 63 / 80 / 81",
+  "palette": "dark",
+  "alt": false,
+  "mean": 37.2,
+  "p95": 98.4
+ },
+ "overcast-rain": {
+  "zh": "大雨 / 暴雨",
+  "codes": "65 / 82",
+  "palette": "dark",
+  "alt": false,
+  "mean": 35.0,
+  "p95": 90.3
+ },
+ "thunderstorms-rain": {
+  "zh": "雷阵雨",
+  "codes": "95 - 99",
+  "palette": "dark",
+  "alt": false,
+  "mean": 28.8,
+  "p95": 80.0
+ },
+ "snow": {
+  "zh": "雪",
+  "codes": "71 - 77 / 85 / 86",
+  "palette": "dark",
+  "alt": false,
+  "mean": 39.5,
+  "p95": 99.5
+ },
+ "sleet": {
+  "zh": "雨夹雪",
+  "codes": "66 / 67 / 56 / 57",
+  "palette": "dark",
+  "alt": false,
+  "mean": 31.9,
+  "p95": 78.9
+ },
+ "partly-cloudy-day-rain": {
+  "zh": "阵雨",
+  "codes": "80 / 81 / 82 (白天) / 51-55",
+  "palette": "light",
+  "alt": false,
+  "mean": 157.7,
+  "p95": 197.8
+ },
+ "partly-cloudy-day-rain-dark": {
+  "zh": "阵雨（深色备选）",
+  "codes": "80 / 81 / 82 (白天) / 51-55",
+  "palette": "dark",
+  "alt": true,
+  "mean": 31.0,
+  "p95": 89.8
+ }
+}

@@ -1,0 +1,30 @@
+# 构建产物
+build/
+sdkconfig
+sdkconfig.old
+
+# 生成物（仓库里只放「源」）
+firmware/assets/assets.bin
+weather-bg/**/*.bin
+weather-bg-480/**/*.bin
+*.zip
+
+# 图标处理工具链（Node 依赖 + 下载的 npm 包 + 中间产物）
+tools/iconwork/node_modules/
+tools/iconwork/*.tgz
+tools/iconwork/anime/
+tools/iconwork/package/
+tools/iconwork/png/
+tools/iconwork/anim/
+
+# Python
+__pycache__/
+*.pyc
+
+# 编辑器 / 系统
+.vscode/
+.DS_Store
+Thumbs.db
+
+# 预览临时图
+preview/_*
