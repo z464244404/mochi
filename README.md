@@ -3,7 +3,13 @@
 一块 **ESP32-S3-LCD-2.8C**（480×480 圆屏 + 六轴 IMU + RTC + TF 卡）做成桌面上会「活着」的小东西：
 桌宠会随着你的 API 余额变化切换动作，摇一摇换应用，应用和素材从网页装进 TF 卡，不用重刷固件。
 
-![桌宠](docs/preview-pet.png)
+![桌宠](docs/photos/pet.jpg)
+
+> 实拍：桌宠底部是 DeepSeek 余额、今日消耗和峰谷徽章（这台是「谷」时）。
+
+| 天气 | 时钟（minimal） |
+|---|---|
+| ![weather](docs/photos/weather.jpg) | ![clock](docs/photos/clock.jpg) |
 
 ## 它能干什么
 
@@ -13,8 +19,6 @@
 | **桌宠** | 吃米饭 / 打字 / 睡觉三段动画，按 DeepSeek 余额状态自动切换；底部叠余额、今日消耗、峰谷徽章 |
 | **时钟** | 三种样式：cute（奶油色 + 日期药丸）、tech（刻度 + 秒弧）、minimal（纯指针 + 可配色） |
 | **天气** | 实时温度 + 未来三天，meteocons 原始动画图标 + 随天气变化的背景，中文天气词 |
-
-![时钟](docs/preview-clock.png)
 
 **插件系统**：应用是「插件」——内置的（网络/桌宠）和卡上的（时钟/天气/你自己写的）走同一套：
 manifest 描述设置项 → 网页自动生成表单 → 保存到 TF 卡 → Lua 里 `app.get()` 读。
