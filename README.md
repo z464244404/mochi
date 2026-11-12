@@ -1,19 +1,57 @@
 # Mochi · 桌面表情摆件
 
-一块 **ESP32-S3-LCD-2.8C**（480×480 圆屏 + 六轴 + RTC），做成桌面上会「活着」的小东西：
-
-- 默认是一个会眨眼、会跟着你倾斜看、被摸会笑的表情；
-- 摇一摇切到下一个应用（时钟、以后的天气/番茄钟…）；
-- 应用可以从网页安装，不用重新刷固件（M2）。
+一块 **ESP32-S3-LCD-2.8C**（480×480 圆屏 + 六轴 IMU + RTC + TF 卡）做成桌面上会「活着」的小东西：
+桌宠会随着你的 API 余额变化切换动作，摇一摇换应用，应用和素材从网页装进 TF 卡，不用重刷固件。
 
 ![桌宠](docs/preview-pet.png)
 
-| 时钟 |
-|---|
-| ![clock](docs/preview-clock.png) |
+## 它能干什么
 
-> 桌宠是 53 帧 24fps 的序列（吃米饭），经 `tools/pack_clip.py` 压成 `.mjp` 放 TF 卡；
-> 时钟那张是 `tools/preview.py` 渲染的设计稿。
+| 屏幕 | 内容 |
+|---|---|
+| **网络** | 没联网时提示热点名/密码；连上后显示本机 IP，局域网里用这个地址打开后台 |
+| **桌宠** | 吃米饭 / 打字 / 睡觉三段动画，按 DeepSeek 余额状态自动切换；底部叠余额、今日消耗、峰谷徽章 |
+| **时钟** | 三种样式：cute（奶油色 + 日期药丸）、tech（刻度 + 秒弧）、minimal（纯指针 + 可配色） |
+| **天气** | 实时温度 + 未来三天，meteocons 原始动画图标 + 随天气变化的背景，中文天气词 |
+
+![时钟](docs/preview-clock.png)
+
+**插件系统**：应用是「插件」——内置的（网络/桌宠）和卡上的（时钟/天气/你自己写的）走同一套：
+manifest 描述设置项 → 网页自动生成表单 → 保存到 TF 卡 → Lua 里 `app.get()` 读。
+每个插件可以单独启用/停用，摇一摇按顺序轮换。
+
+**网页后台**：插件安装/启用/设置、WiFi 扫描与连接、OTA 升级、手势调试，全部设备自己提供 HTTP 服务（不需要连外网）。
+
+## 快速开始
+
+```bash
+# 1. 装 ESP-IDF v5.5.x
+# 2. 生成素材包（仓库里不含 assets.bin，它是从下面这些源生成出来的）
+python tools/pack_assets.py --out firmware/assets/assets.bin \
+    --add pet.mjp=firmware/assets/pet.mjp \
+    --add work.mjp=firmware/assets/work.mjp \
+    --add sleep.mjp=firmware/assets/sleep.mjp \
+    --add icons.bin=firmware/assets/icons.bin \
+    --add bg.bin=firmware/assets/bg.bin
+
+# 3. 编译烧录（第一次用 flash，会同时把素材写进 assets 分区）
+cd firmware
+idf.py set-target esp32s3
+idf.py -p COM10 flash monitor
+```
+
+第一次开机设备会把素材从 flash 分区同步到 TF 卡，然后自动擦掉那个分区——
+素材只留在卡上，闪存不背这个包袱。
+
+## 文档
+
+| 文档 | 内容 |
+|---|---|
+| [docs/user-guide.md](docs/user-guide.md) | **怎么用**：屏幕、手势、网页后台、WiFi、插件装/删/设置、OTA |
+| [docs/plugin-guide.md](docs/plugin-guide.md) | **怎么写插件**：目录结构、manifest、完整 Lua API、示例、调试与限制 |
+| [docs/architecture.md](docs/architecture.md) | 系统设计：渲染、内存布局、素材管线、双核分工 |
+| [docs/verification.md](docs/verification.md) | 实机验证记录：每一步的串口日志、踩过的坑和修法 |
+| [docs/screenshots.md](docs/screenshots.md) | 怎么抓真机截图（现在仓库里的是渲染预览） |
 
 ---
 
@@ -22,9 +60,9 @@
 | 阶段 | 内容 | 状态 |
 |---|---|---|
 | **M1 内核** | 渲染器 / 桌宠动画 / 时钟 / 摇一摇 / 轻敲 / 翻转息屏 / RTC | 已上机：桌宠从 TF 卡播放，24fps（素材原速） |
-| **M2 插件** | Lua 运行时 / 沙箱 / `ui` + `time` API | 已上机：内置 demo 跑通 |
+| **M2 插件** | Lua 运行时 / 沙箱 / `ui` + `time` + `http` + `json` + `store` API | 已上机：时钟、天气两个插件跑通 |
 | **M2 后台** | WiFi AP+STA、网页管理、插件安装、NTP | 已上机：自检跑通「上传→安装→列表」 |
-| M3 生态 | 插件市场、更多字号、天气/番茄钟示例 | 待做 |
+| M3 生态 | 插件市场、更多字号 | 待做 |
 
 完整设计见 [docs/architecture.md](docs/architecture.md)，实机记录见 [docs/verification.md](docs/verification.md)。
 
