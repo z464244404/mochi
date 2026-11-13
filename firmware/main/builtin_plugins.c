@@ -308,7 +308,108 @@ static const char *WEATHER_LUA =
     "end\n"
     ;
 
+static const char *DFM_MANIFEST =
+    "{\n"
+    "  \"id\": \"dfm\",\n"
+    "  \"name\": \"三角洲\",\n"
+    "  \"version\": \"2.0.0\",\n"
+    "  \"api\": 1,\n"
+    "  \"author\": \"mochi\",\n"
+    "  \"settings\": [\n"
+    "    {\"key\": \"hint\", \"label\": \"数据来源\", \"type\": \"text\",\n"
+    "     \"default\": \"电脑上运行 python tools/df_sync.py 推送\"}\n"
+    "  ]\n"
+    "}\n"
+    ;
+
+static const char *DFM_LUA =
+    "-- 三角洲行动 玩家数据（只负责显示）\n"
+    "-- 数据由电脑上的 tools/df_sync.py 拉腾讯接口后推过来：POST /api/dfm\n"
+    "local t = 0\n"
+    "local last_reload = -1\n"
+    "local nick, rank, liquid, noncurrent, gain, ts\n"
+    "\n"
+    "local function fmt(n)\n"
+    "  n = tonumber(n) or 0\n"
+    "  local a = math.abs(n)\n"
+    "  if a >= 100000000 then return string.format(\"%.2f亿\", n / 100000000) end\n"
+    "  if a >= 10000 then return string.format(\"%.1f万\", n / 10000) end\n"
+    "  return string.format(\"%d\", n)\n"
+    "end\n"
+    "\n"
+    "local function signed(n)\n"
+    "  local v = tonumber(n) or 0\n"
+    "  if v > 0 then return \"+\" .. fmt(v) end\n"
+    "  return fmt(v)\n"
+    "end\n"
+    "\n"
+    "local function load()\n"
+    "  nick = store.get(\"nick\") or \"\"\n"
+    "  rank = tonumber(store.get(\"rank\") or \"0\") or 0\n"
+    "  liquid = tonumber(store.get(\"liquid\") or \"0\") or 0\n"
+    "  noncurrent = tonumber(store.get(\"noncur\") or \"0\") or 0\n"
+    "  gain = tonumber(store.get(\"gain\") or \"0\") or 0\n"
+    "  ts = tonumber(store.get(\"ts\") or \"0\") or 0\n"
+    "end\n"
+    "\n"
+    "function on_start()\n"
+    "  load()\n"
+    "end\n"
+    "\n"
+    "local function draw_wait()\n"
+    "  ui.text(\"等待数据\", 240, 210, 29, 0xffc86b)\n"
+    "  ui.text(\"电脑上运行 df_sync.py\", 240, 256, 22, 0x6b7785)\n"
+    "  ui.text(\"会把数据推过来\", 240, 288, 22, 0x6b7785)\n"
+    "end\n"
+    "\n"
+    "function on_draw(dt)\n"
+    "  t = t + dt\n"
+    "  -- 每 2 秒重新读一次卡上的 data.json（脚本随时可能推送）\n"
+    "  if t - last_reload > 2 then\n"
+    "    last_reload = t\n"
+    "    store.reload()\n"
+    "    load()\n"
+    "  end\n"
+    "\n"
+    "  ui.clear(0x0b0d12)\n"
+    "  if not nick or nick == \"\" then\n"
+    "    draw_wait()\n"
+    "    return\n"
+    "  end\n"
+    "\n"
+    "  ui.text(nick, 240, 54, 22, 0x8fa0b4)\n"
+    "  ui.text(tostring(rank), 240, 148, 106, 0xf4f7f8)\n"
+    "  ui.text(\"烽火段位\", 240, 214, 22, 0x8fa0b4)\n"
+    "\n"
+    "  ui.text(\"流动\", 132, 268, 22, 0x8fa0b4)\n"
+    "  ui.text(\"非流动\", 348, 268, 22, 0x8fa0b4)\n"
+    "  ui.text(fmt(liquid), 132, 302, 29, 0xdfe8f0)\n"
+    "  ui.text(fmt(noncurrent), 348, 302, 29, 0xdfe8f0)\n"
+    "\n"
+    "  ui.text(\"最近收益\", 240, 356, 22, 0x8fa0b4)\n"
+    "  if gain == 0 then\n"
+    "    ui.text(\"0\", 240, 392, 29, 0x8fa0b4)\n"
+    "  elseif gain > 0 then\n"
+    "    ui.text(signed(gain) .. \" ↑\", 240, 392, 29, 0xff5a5a)\n"
+    "  else\n"
+    "    ui.text(signed(gain) .. \" ↓\", 240, 392, 29, 0x35d07f)\n"
+    "  end\n"
+    "\n"
+    "  -- 数据陈旧提示\n"
+    "  local age = time.epoch() - ts\n"
+    "  if ts > 0 and age > 1800 then\n"
+    "    ui.text(\"数据 \" .. string.format(\"%d\", math.floor(age / 60)) .. \" 分钟前\",\n"
+    "            240, 440, 22, 0xff9f43)\n"
+    "  end\n"
+    "end\n"
+    ;
+
 static const builtin_file_t CLOCK_FILES[] = {
+    {"manifest.json", NULL},
+    {"main.lua", NULL},
+};
+
+static const builtin_file_t DFM_FILES[] = {
     {"manifest.json", NULL},
     {"main.lua", NULL},
 };
@@ -325,6 +426,10 @@ static const char *file_content(const builtin_plugin_t *p, const char *name)
         if (!strcmp(name, "manifest.json")) return CLOCK_MANIFEST;
         if (!strcmp(name, "main.lua")) return CLOCK_LUA;
     }
+    if (!strcmp(p->id, "dfm")) {
+        if (!strcmp(name, "manifest.json")) return DFM_MANIFEST;
+        if (!strcmp(name, "main.lua")) return DFM_LUA;
+    }
     if (!strcmp(p->id, "weather")) {
         if (!strcmp(name, "manifest.json")) return WEATHER_MANIFEST;
         if (!strcmp(name, "main.lua")) return WEATHER_LUA;
@@ -334,6 +439,7 @@ static const char *file_content(const builtin_plugin_t *p, const char *name)
 
 static const builtin_plugin_t BUILTINS[] = {
     {"clock", "时钟（cute / tech / minimal）", "1.1.0", CLOCK_FILES},
+    {"dfm", "三角洲", "2.0.0", DFM_FILES},
     {"weather", "天气（实时 + 未来三天）", "2.5.0", WEATHER_FILES},
     {NULL, NULL, NULL, NULL},
 };

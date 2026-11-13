@@ -37,11 +37,18 @@
 #define DRAW_BUDGET 120000 /* 单帧指令上限 */
 #define HTTP_BODY_MAX 8192
 #define URL_MAX 255
+#define HTTP_BODY_SEND 768  /* POST 请求体上限 */
+#define HTTP_HDR_MAX 4
+#define HTTP_HDR_LEN 192
 
 static const char *TAG = "lua";
 
 typedef struct {
     char url[URL_MAX + 1];
+    char body[HTTP_BODY_SEND];
+    char hdr[HTTP_HDR_MAX][HTTP_HDR_LEN]; /* "Key: value" */
+    int nhdr;
+    bool post;
     int ref;
     uint32_t gen;
 } http_req_t;
@@ -324,9 +331,39 @@ static int l_store_set(lua_State *L_)
     return 0;
 }
 
+/* store.reload() —— 重新从卡上读一遍（外部推送数据后刷新用） */
+static void data_load(void)
+{
+    if (s_data) {
+        cJSON_Delete(s_data);
+        s_data = NULL;
+    }
+    if (!s_data_path[0]) return;
+    FILE *f = fopen(s_data_path, "rb");
+    if (!f) return;
+    char *buf = heap_caps_malloc(8192, MALLOC_CAP_SPIRAM);
+    if (!buf) {
+        fclose(f);
+        return;
+    }
+    size_t n = fread(buf, 1, 8191, f);
+    buf[n] = 0;
+    s_data = cJSON_Parse(buf);
+    heap_caps_free(buf);
+    fclose(f);
+}
+
+static int l_store_reload(lua_State *L_)
+{
+    (void)L_;
+    data_load();
+    return 0;
+}
+
 static const luaL_Reg store_funcs[] = {
     {"get", l_store_get},
     {"set", l_store_set},
+    {"reload", l_store_reload},
     {NULL, NULL},
 };
 
@@ -376,12 +413,23 @@ static void http_worker(void *arg)
         if (body) {
             esp_http_client_config_t cfg = {
                 .url = req.url,
-                .timeout_ms = 12000,
+                .timeout_ms = 15000,
                 .crt_bundle_attach = esp_crt_bundle_attach,
             };
             esp_http_client_handle_t c = esp_http_client_init(&cfg);
             if (c) {
-                if (esp_http_client_open(c, 0) == ESP_OK) {
+                for (int i = 0; i < req.nhdr; i++) {
+                    char *colon = strchr(req.hdr[i], ':');
+                    if (!colon) continue;
+                    *colon = 0;
+                    char *val = colon + 1;
+                    while (*val == ' ') val++;
+                    esp_http_client_set_header(c, req.hdr[i], val);
+                }
+                size_t send_len = req.post ? strlen(req.body) : 0;
+                if (req.post) esp_http_client_set_method(c, HTTP_METHOD_POST);
+                if (esp_http_client_open(c, send_len) == ESP_OK) {
+                    if (send_len) esp_http_client_write(c, req.body, send_len);
                     esp_http_client_fetch_headers(c);
                     int n = esp_http_client_read(c, body, HTTP_BODY_MAX - 1);
                     body[n > 0 ? n : 0] = 0;
@@ -391,12 +439,13 @@ static void http_worker(void *arg)
                 esp_http_client_cleanup(c);
             }
             if (status != 200) ESP_LOGW(TAG, "http %d: %s", status, req.url);
+            else ESP_LOGI(TAG, "http 200 %s (%u B)", req.url, (unsigned)strlen(body));
         }
 
         http_res_t res = {.ref = req.ref, .status = status, .body = body, .gen = req.gen};
 
-        /* 成功的响应留一份给缓存 */
-        if (status == 200 && body && body[0]) {
+        /* 成功的 GET 响应留一份给缓存（POST 不缓存） */
+        if (!req.post && status == 200 && body && body[0]) {
             if (!s_cache_stage) s_cache_stage = heap_caps_malloc(HTTP_BODY_MAX, MALLOC_CAP_SPIRAM);
             if (s_cache_stage) {
                 strncpy(s_cache_stage, body, HTTP_BODY_MAX - 1);
@@ -439,9 +488,56 @@ static int l_http_get(lua_State *L_)
     }
 
     http_req_t req;
+    memset(&req, 0, sizeof(req));
     snprintf(req.url, sizeof(req.url), "%s", url);
     req.ref = ref;
     req.gen = s_gen;
+    if (!s_req_q || xQueueSend(s_req_q, &req, 0) != pdTRUE) {
+        luaL_unref(L_, LUA_REGISTRYINDEX, ref);
+        lua_pushboolean(L_, 0);
+        return 1;
+    }
+    lua_pushboolean(L_, 1);
+    return 1;
+}
+
+/* http.post(url, body, [headers_table,] cb) */
+static int l_http_post(lua_State *L_)
+{
+    const char *url = luaL_checkstring(L_, 1);
+    const char *body = luaL_checkstring(L_, 2);
+    int cb_idx = lua_gettop(L_);
+    luaL_checktype(L_, cb_idx, LUA_TFUNCTION);
+    int hdr_idx = (cb_idx >= 4) ? 3 : 0;
+
+    if (strlen(url) > URL_MAX || strlen(body) >= HTTP_BODY_SEND) {
+        lua_pushboolean(L_, 0);
+        return 1;
+    }
+
+    lua_pushvalue(L_, cb_idx);
+    int ref = luaL_ref(L_, LUA_REGISTRYINDEX);
+
+    http_req_t req;
+    memset(&req, 0, sizeof(req));
+    snprintf(req.url, sizeof(req.url), "%s", url);
+    snprintf(req.body, sizeof(req.body), "%s", body);
+    req.post = true;
+    req.ref = ref;
+    req.gen = s_gen;
+
+    if (hdr_idx) {
+        lua_pushnil(L);
+        while (lua_next(L, hdr_idx) != 0 && req.nhdr < HTTP_HDR_MAX) {
+            if (lua_type(L, -2) == LUA_TSTRING && lua_type(L, -1) == LUA_TSTRING) {
+                snprintf(req.hdr[req.nhdr], HTTP_HDR_LEN, "%s: %s", lua_tostring(L, -2),
+                         lua_tostring(L, -1));
+                req.nhdr++;
+            }
+            lua_pop(L, 1);
+        }
+    }
+
     if (!s_req_q || xQueueSend(s_req_q, &req, 0) != pdTRUE) {
         luaL_unref(L_, LUA_REGISTRYINDEX, ref);
         lua_pushboolean(L_, 0);
@@ -522,6 +618,7 @@ static const luaL_Reg json_funcs[] = {
 
 static const luaL_Reg http_funcs[] = {
     {"get", l_http_get},
+    {"post", l_http_post},
     {NULL, NULL},
 };
 

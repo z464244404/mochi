@@ -299,6 +299,68 @@ static esp_err_t active_post(httpd_req_t *r)
     return send_json(r, j);
 }
 
+/* POST /api/dfm?nick=&rank=&liquid=&noncur=&gain=&ts=
+ * 电脑上的 tools/df_sync.py 拉完腾讯接口后推过来，插件只负责显示 */
+static void url_decode(char *s)
+{
+    char *o = s;
+    for (char *p = s; *p; p++) {
+        if (*p == '%' && p[1] && p[2]) {
+            char hex[3] = {p[1], p[2], 0};
+            *o++ = (char)strtol(hex, NULL, 16);
+            p += 2;
+        } else if (*p == '+') {
+            *o++ = ' ';
+        } else {
+            *o++ = *p;
+        }
+    }
+    *o = 0;
+}
+
+static esp_err_t dfm_post(httpd_req_t *r)
+{
+    char nick[128] = "", rank[16] = "0", liquid[24] = "0", noncur[24] = "0";
+    char gain[24] = "0", ts[24] = "0";
+
+    query(r, "nick", nick, sizeof(nick));
+    query(r, "rank", rank, sizeof(rank));
+    query(r, "liquid", liquid, sizeof(liquid));
+    query(r, "noncur", noncur, sizeof(noncur));
+    query(r, "gain", gain, sizeof(gain));
+    query(r, "ts", ts, sizeof(ts));
+    url_decode(nick);
+
+    cJSON *o = cJSON_CreateObject();
+    if (!o) return send_json(r, NULL);
+    cJSON_AddStringToObject(o, "nick", nick);
+    cJSON_AddStringToObject(o, "rank", rank);
+    cJSON_AddStringToObject(o, "liquid", liquid);
+    cJSON_AddStringToObject(o, "noncur", noncur);
+    cJSON_AddStringToObject(o, "gain", gain);
+    cJSON_AddStringToObject(o, "ts", ts);
+
+    char *js = cJSON_PrintUnformatted(o);
+    bool ok = false;
+    if (js) {
+        FILE *f = sd_open_write("/sdcard/plugins/dfm/data.json", 3);
+        if (f) {
+            ok = fwrite(js, 1, strlen(js), f) == strlen(js);
+            fclose(f);
+        }
+        cJSON_free(js);
+    }
+    cJSON_Delete(o);
+
+    ESP_LOGI(TAG, "dfm push: %s rank=%s (+%s) ok=%d", nick, rank, gain, (int)ok);
+    cJSON *res = cJSON_CreateObject();
+    if (res) {
+        cJSON_AddBoolToObject(res, "ok", ok);
+        return send_json(r, res);
+    }
+    return ESP_OK;
+}
+
 /* POST /api/gesture?event=next|prev|shake|tap */
 static esp_err_t gesture_post(httpd_req_t *r)
 {
@@ -583,6 +645,7 @@ esp_err_t web_start(void)
     httpd_config_t cfg = HTTPD_DEFAULT_CONFIG();
     cfg.max_uri_handlers = 20;
     cfg.stack_size = 12288;
+    cfg.max_open_sockets = 4;
     cfg.lru_purge_enable = true;
 
     if (httpd_start(&s_srv, &cfg) != ESP_OK) {
@@ -607,6 +670,7 @@ esp_err_t web_start(void)
         {.uri = "/api/gesture", .method = HTTP_POST, .handler = gesture_post},
         {.uri = "/api/wifi", .method = HTTP_POST, .handler = wifi_post},
         {.uri = "/api/ota", .method = HTTP_POST, .handler = ota_post},
+    {.uri = "/api/dfm", .method = HTTP_POST, .handler = dfm_post},
     };
     for (size_t i = 0; i < sizeof(uris) / sizeof(uris[0]); i++) {
         httpd_register_uri_handler(s_srv, &uris[i]);

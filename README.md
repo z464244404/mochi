@@ -23,6 +23,7 @@
 | **桌宠** | 吃米饭 / 打字 / 睡觉三段动画，按 DeepSeek 余额状态自动切换；底部叠余额、今日消耗、峰谷徽章 |
 | **时钟** | 三种样式：cute（奶油色 + 日期药丸）、tech（刻度 + 秒弧）、minimal（纯指针 + 可配色） |
 | **天气** | 实时温度 + 未来三天，meteocons 原始动画图标 + 随天气变化的背景，中文天气词 |
+| **三角洲** | 昵称、烽火段位分、流动/非流动总资产、最近收益（红涨绿跌带箭头）——数据由电脑上的 	ools/df_sync.py 推送 |
 
 **插件系统**：应用是「插件」——内置的（网络/桌宠）和卡上的（时钟/天气/你自己写的）走同一套：
 manifest 描述设置项 → 网页自动生成表单 → 保存到 TF 卡 → Lua 里 `app.get()` 读。
@@ -67,6 +68,7 @@ idf.py -p COM10 flash monitor
 | [docs/user-guide.md](docs/user-guide.md) | **怎么用**：屏幕、手势、网页后台、WiFi、插件装/删/设置、OTA |
 | [docs/plugin-guide.md](docs/plugin-guide.md) | **怎么写插件**：目录结构、manifest、完整 Lua API、示例、调试与限制 |
 | [docs/api.md](docs/api.md) | **HTTP API**：所有接口的参数、返回示例、curl 用法 |
+| [docs/dfm.md](docs/dfm.md) | **三角洲插件**：登录、推送脚本、字段来源 |
 | [docs/hardware.md](docs/hardware.md) | **硬件**：引脚表、I2C 地址、IO 扩展、TF 卡接法、内存分布 |
 | [docs/architecture.md](docs/architecture.md) | 系统设计：渲染、内存布局、素材管线、双核分工 |
 | [docs/verification.md](docs/verification.md) | 实机验证记录：每一步的串口日志、踩过的坑和修法 |

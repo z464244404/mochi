@@ -31,3 +31,5 @@ preview/_*
 
 # 发布的固件包（体积大，放 GitHub Release）
 release/*.bin
+
+tools/df_token.json
