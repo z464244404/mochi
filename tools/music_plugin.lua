@@ -22,7 +22,13 @@ local BAR_X0, BAR_X1, BAR_Y = 100, 380, 378
 
 local function read()
   local m = music.get()
-  if not m then return false end
+  if not m then
+    -- 电脑那边没在放了：清空，回到「等待播放」
+    title, artist = "", ""
+    pos, dur = 0, 0
+    playing = false
+    return false
+  end
   title = m.title or ""
   artist = m.artist or ""
   pos = tonumber(m.pos) or 0
