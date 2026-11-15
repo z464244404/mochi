@@ -97,7 +97,7 @@ async def main_async(args):
                 if last_key is not None:
                     if not args.dry_run:
                         push_meta(args.host, "", "", 0, 0, False)
-                    print("· 没有播放")
+                    print("  [空闲] 没有播放")
                     last_key = None
                 await asyncio.sleep(args.interval)
                 continue
@@ -121,7 +121,7 @@ async def main_async(args):
                         push_cover(args.host, cover)
                     except Exception as e:
                         print("× 封面上传失败:", e)
-                print("♪ %s - %s  (%s)" % (title, artist, "封面已传" if cover is not None else "无封面"))
+                print("  [换歌] %s - %s  (%s)" % (title, artist, "封面已传" if cover is not None else "无封面"))
                 last_push = 0
 
             if playing != last_playing or time.time() - last_push > args.sync_every:
@@ -134,7 +134,7 @@ async def main_async(args):
                 last_playing = playing
                 if args.dry_run:
                     print("  %s %d:%02d/%d:%02d" %
-                          ("▶" if playing else "⏸", pos // 60, pos % 60, dur // 60, dur % 60))
+                          ("播放" if playing else "暂停", pos // 60, pos % 60, dur // 60, dur % 60))
 
         except KeyboardInterrupt:
             raise
@@ -150,6 +150,11 @@ def push_cover(host, im):
 
 
 def main():
+    try:
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    except Exception:
+        pass
+
     ap = argparse.ArgumentParser(description="把正在播放的歌推到 Mochi 摆件")
     ap.add_argument("--host", help="摆件 IP（看设备『网络』屏）")
     ap.add_argument("--interval", type=float, default=2.0, help="轮询间隔秒，默认 2")
