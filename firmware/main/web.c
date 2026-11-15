@@ -907,7 +907,7 @@ static void selftest_task(void *arg)
 esp_err_t web_start(void)
 {
     httpd_config_t cfg = HTTPD_DEFAULT_CONFIG();
-    cfg.max_uri_handlers = 20;
+    cfg.max_uri_handlers = 32; /* 接口已经 21 个了，20 会静默丢最后一个 */
     cfg.stack_size = 12288;
     cfg.max_open_sockets = 4;
     cfg.lru_purge_enable = true;
