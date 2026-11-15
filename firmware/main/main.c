@@ -209,6 +209,37 @@ static void poll_button(void)
     }
 }
 
+/* 卡挂上之后要做的事：查素材、写探针、同步 assets、加载图标/背景/字体包、扫描插件。
+ * 开机时和「卡后来才插上」时都会走这里。 */
+static void sd_services_init(void)
+{
+    FILE *f = fopen("/sdcard/pet.mjp", "rb");
+    if (f) {
+        fseek(f, 0, SEEK_END);
+        long sz = ftell(f);
+        fclose(f);
+        ESP_LOGI(TAG, "SD: pet.mjp %ld KB", sz / 1024);
+    } else {
+        ESP_LOGW(TAG, "SD: pet.mjp not found");
+    }
+
+    /* 挂载后第一次写偶尔会失败，先写个探针把坑占掉 */
+    mkdir("/sdcard/plugins", 0777);
+    FILE *probe = sd_open_write("/sdcard/plugins/.probe", 10);
+    ESP_LOGI(TAG, "SD write probe: %s", probe ? "ok" : "failed");
+    if (probe) {
+        fputc('x', probe);
+        fclose(probe);
+        remove("/sdcard/plugins/.probe");
+    }
+
+    builtin_sync();
+    assets_sync();
+    icons_init();
+    bg_init();
+    fp_init();
+}
+
 void app_main(void)
 {
     ESP_LOGI(TAG, "========== Mochi 0.1 ==========");
@@ -221,31 +252,7 @@ void app_main(void)
     }
 
     if (sd_mount() == ESP_OK) {
-        FILE *f = fopen("/sdcard/pet.mjp", "rb");
-        if (f) {
-            fseek(f, 0, SEEK_END);
-            long sz = ftell(f);
-            fclose(f);
-            ESP_LOGI(TAG, "SD: pet.mjp %ld KB", sz / 1024);
-        } else {
-            ESP_LOGW(TAG, "SD: pet.mjp not found");
-        }
-
-        /* 挂载后第一次写偶尔会失败，先写个探针把坑占�?*/
-        mkdir("/sdcard/plugins", 0777);
-        FILE *probe = sd_open_write("/sdcard/plugins/.probe", 10);
-        ESP_LOGI(TAG, "SD write probe: %s", probe ? "ok" : "failed");
-        if (probe) {
-            fputc('x', probe);
-            fclose(probe);
-            remove("/sdcard/plugins/.probe");
-        }
-
-        builtin_sync();
-        assets_sync();
-        icons_init();
-        bg_init();
-        fp_init();
+        sd_services_init();
     }
 
     net_init();
@@ -285,12 +292,23 @@ void app_main(void)
     uint32_t draw_n = 0;
     int64_t fps_t0 = last;
     uint32_t fps_n = 0;
+    int64_t last_sd_probe = last;
     for (;;) {
         lcd_wait_vsync(200);
         int64_t now = esp_timer_get_time();
         float dt = (float)(now - last) / 1000000.0f;
         last = now;
         if (dt > 0.1f) dt = 0.1f;
+
+        /* 卡没插好也能救：每 5 秒试着挂一次，插上就自动恢复，不用重启 */
+        if (!sd_ready() && now - last_sd_probe > 5000000) {
+            last_sd_probe = now;
+            if (sd_mount() == ESP_OK) {
+                ESP_LOGI(TAG, "SD inserted, re-initialising");
+                sd_services_init();
+                apps_reload();
+            }
+        }
 
         if (now - last_log > 30000000) {
             uint32_t vs = lcd_vsync_count();

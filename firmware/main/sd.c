@@ -45,7 +45,14 @@ esp_err_t sd_mount(void)
     slot.width = 1;
     slot.flags |= SDMMC_SLOT_FLAG_INTERNAL_PULLUP;
 
-    esp_err_t err = esp_vfs_fat_sdmmc_mount("/sdcard", &host, &slot, &mcfg, &s_card);
+    esp_err_t err = ESP_FAIL;
+    /* 卡没插好/刚上电接触不良时 mount 会失败，多试几次再放弃 */
+    for (int attempt = 0; attempt < 3; attempt++) {
+        err = esp_vfs_fat_sdmmc_mount("/sdcard", &host, &slot, &mcfg, &s_card);
+        if (err == ESP_OK) break;
+        ESP_LOGW(TAG, "mount attempt %d failed: %s", attempt + 1, esp_err_to_name(err));
+        vTaskDelay(pdMS_TO_TICKS(150));
+    }
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "mount failed: %s", esp_err_to_name(err));
         s_ok = false;
