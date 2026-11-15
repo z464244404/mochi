@@ -112,6 +112,15 @@
   <div class="hint" id="wifihint">连上后会自动对时，屏幕和状态栏都会显示路由器分配的 IP。</div>
 </div>
 
+<h2>字体包</h2>
+<div class="card">
+  <div class="row"><span>已装字形</span><span id="fontn">-</span></div>
+  <input type="file" id="fontpk" accept=".bin">
+  <div class="row-btns"><button class="primary" onclick="uploadFont()">上传字体包</button></div>
+  <div class="hint">选 <code>release/fontpack.bin</code>（5.8 MB，含 GB2312 全部汉字）。
+    装好后插件里任何中文都能显示，不用再改固件。上传过程约 10 秒，别关页面。</div>
+</div>
+
 <h2>固件</h2>
 <div class="card">
   <input type="file" id="fw">
@@ -161,6 +170,8 @@ async function refresh() {
     $('#apip').textContent = 'http://' + s.ip;
     $('#staip').textContent = s.sta_ip ? 'http://' + s.sta_ip : '未连接';
     $('#stastate').textContent = stateText(s);
+    const fn = $('#fontn');
+    if (fn) fn.textContent = s.font ? s.font + ' 字' : '未安装';
     const a = await api('/api/apps');
     const box = $('#apps');
     if (!a.apps.length) {
@@ -350,6 +361,23 @@ async function ota() {
   toast('上传中，别断电…');
   await fetch('/api/ota', { method: 'POST', body: f });
   toast('完成，设备重启中');
+}
+async function uploadFont() {
+  const f = $('#fontpk').files[0];
+  if (!f) return toast('先选 fontpack.bin');
+  toast('上传中（约 10 秒），别关页面…');
+  try {
+    const r = await fetch('/api/fontpack', { method: 'POST', body: f });
+    const j = await r.json();
+    if (j.ok) {
+      $('#fontn').textContent = j.glyphs + ' 字';
+      toast('字体包已装好：' + j.glyphs + ' 个字形');
+    } else {
+      toast('失败：文件格式不对？');
+    }
+  } catch (e) {
+    toast('上传中断：' + e.message);
+  }
 }
 refresh();
 loadBuiltin();

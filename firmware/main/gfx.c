@@ -3,6 +3,8 @@
 #include <math.h>
 #include <string.h>
 
+#include "fontpack.h"
+
 /* ------------------------------------------------------------------ */
 /* 基础：RGB565 混合                                                    */
 /* ------------------------------------------------------------------ */
@@ -405,7 +407,12 @@ float gfx_text_width(const mochi_font_t *f, const char *utf8)
         if (gl) {
             w += gl->adv;
         } else {
-            w += f->line_h * 0.5f;
+            uint16_t adv = 0;
+            if (fp_adv(cp, &adv)) {
+                w += adv; /* 卡上的字体包 */
+            } else {
+                w += f->line_h * 0.5f;
+            }
         }
     }
     return w;
@@ -425,11 +432,22 @@ void gfx_text(gfx_t *g, const mochi_font_t *f, const char *utf8, float x, float 
     while (*utf8) {
         uint32_t cp = utf8_next(&utf8);
         const mochi_glyph_t *gl = find_glyph(f, cp);
-        if (!gl) continue;
+        const uint8_t *src = NULL;
+        mochi_glyph_t tmp;
+        if (gl) {
+            src = f->bitmap + gl->off;
+        } else if (fp_glyph(cp, &tmp, &src)) {
+            gl = &tmp; /* 卡上的字体包 */
+            if (!src) {
+                pen += gl->adv;
+                continue; /* 空字形 */
+            }
+        } else {
+            continue;
+        }
 
         int gx = (int)lroundf(pen) + gl->bx;
         int gy = base + gl->by;
-        const uint8_t *src = f->bitmap + gl->off;
 
         int ca = (int)(argb >> 24) * g->alpha / 255;
         int y_start = 0, y_end = gl->h;

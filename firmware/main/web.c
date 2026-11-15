@@ -21,6 +21,7 @@
 #include "plugin_conf.h"
 #include "plugins.h"
 #include "sd.h"
+#include "fontpack.h"
 #include "www.h"
 
 static const char *TAG = "web";
@@ -296,6 +297,71 @@ static esp_err_t active_post(httpd_req_t *r)
 
     cJSON *j = cJSON_CreateObject();
     cJSON_AddBoolToObject(j, "ok", true);
+    return send_json(r, j);
+}
+
+/* POST /api/fontpack —— 上传 TF 卡字体包（body 就是 fontpack.bin 原始字节） */
+static esp_err_t fontpack_put(httpd_req_t *r)
+{
+    if (r->content_len <= 0) {
+        httpd_resp_send_err(r, HTTPD_400_BAD_REQUEST, "empty body");
+        return ESP_FAIL;
+    }
+
+    char *buf = heap_caps_malloc(4096, MALLOC_CAP_SPIRAM);
+    if (!buf) {
+        httpd_resp_send_err(r, HTTPD_500_INTERNAL_SERVER_ERROR, "no mem");
+        return ESP_FAIL;
+    }
+
+    mkdir("/sdcard/fonts", 0777);
+    const char *tmp = "/sdcard/fonts/fontpack.tmp";
+    const char *dst = "/sdcard/fonts/fontpack.bin";
+
+    FILE *f = NULL;
+    for (int attempt = 0; attempt < 3 && !f; attempt++) f = sd_open_write(tmp, 5);
+    if (!f) {
+        heap_caps_free(buf);
+        httpd_resp_send_err(r, HTTPD_500_INTERNAL_SERVER_ERROR, "open failed");
+        return ESP_FAIL;
+    }
+
+    int remaining = r->content_len;
+    int total = 0;
+    bool io_ok = true;
+    while (remaining > 0) {
+        int want = remaining < 4096 ? remaining : 4096;
+        int n = httpd_req_recv(r, buf, want);
+        if (n <= 0) {
+            io_ok = false;
+            break;
+        }
+        if (fwrite(buf, 1, n, f) != (size_t)n) {
+            io_ok = false;
+            break;
+        }
+        total += n;
+        remaining -= n;
+    }
+    fclose(f);
+    heap_caps_free(buf);
+
+    if (!io_ok) {
+        unlink(tmp);
+        httpd_resp_send_err(r, HTTPD_500_INTERNAL_SERVER_ERROR, "write failed");
+        return ESP_FAIL;
+    }
+    unlink(dst);
+    rename(tmp, dst);
+
+    bool ok = fp_init();
+    ESP_LOGI(TAG, "fontpack uploaded: %d bytes, %d glyphs", total, fp_count());
+
+    cJSON *j = cJSON_CreateObject();
+    if (!j) return ESP_OK;
+    cJSON_AddBoolToObject(j, "ok", ok);
+    cJSON_AddNumberToObject(j, "bytes", total);
+    cJSON_AddNumberToObject(j, "glyphs", fp_count());
     return send_json(r, j);
 }
 
@@ -671,6 +737,7 @@ esp_err_t web_start(void)
         {.uri = "/api/wifi", .method = HTTP_POST, .handler = wifi_post},
         {.uri = "/api/ota", .method = HTTP_POST, .handler = ota_post},
     {.uri = "/api/dfm", .method = HTTP_POST, .handler = dfm_post},
+    {.uri = "/api/fontpack", .method = HTTP_POST, .handler = fontpack_put},
     };
     for (size_t i = 0; i < sizeof(uris) / sizeof(uris[0]); i++) {
         httpd_register_uri_handler(s_srv, &uris[i]);

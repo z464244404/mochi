@@ -17,6 +17,7 @@
 
 #include "gfx.h"
 #include "bg.h"
+#include "fontpack.h"
 #include "icons.h"
 #include "imu.h"
 #include "io.h"
@@ -244,6 +245,7 @@ void app_main(void)
         assets_sync();
         icons_init();
         bg_init();
+        fp_init();
     }
 
     net_init();
