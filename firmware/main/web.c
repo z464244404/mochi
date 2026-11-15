@@ -44,7 +44,8 @@ static esp_err_t send_json(httpd_req_t *r, cJSON *j)
 
 static bool query(httpd_req_t *r, const char *key, char *out, size_t n)
 {
-    char buf[256];
+    /* 中文 SSID 百分号编码后每个汉字占 9 个字符，再加 64 字节密码，256 不够用 */
+    char buf[640];
     if (httpd_req_get_url_query_str(r, buf, sizeof(buf)) != ESP_OK) return false;
     if (httpd_query_key_value(buf, key, out, n) != ESP_OK) return false;
     return true;
@@ -544,15 +545,51 @@ static esp_err_t gesture_post(httpd_req_t *r)
     return send_json(r, j);
 }
 
+/* 只解 %XX，不把 '+' 当空格：网页用 encodeURIComponent，
+ * 空格是 %20、'+' 原样保留，按表单语义解会把 SSID 里的 '+' 变成空格 */
+static void url_decode_pct(char *s)
+{
+    char *o = s;
+    for (char *p = s; *p; p++) {
+        if (*p == '%' && p[1] && p[2]) {
+            char hex[3] = {p[1], p[2], 0};
+            char *end = NULL;
+            long v = strtol(hex, &end, 16);
+            if (end && *end == 0) {
+                *o++ = (char)v;
+                p += 2;
+                continue;
+            }
+        }
+        *o++ = *p;
+    }
+    *o = 0;
+}
+
 /* POST /api/wifi?ssid=..&pass=.. */
 static esp_err_t wifi_post(httpd_req_t *r)
 {
-    char ssid[64] = {0}, pass[64] = {0};
+    /* 百分号编码后的中文 SSID 可能到 96 字符，缓冲区要够大 */
+    char ssid[192] = {0}, pass[224] = {0};
     if (!query(r, "ssid", ssid, sizeof(ssid))) {
         httpd_resp_send_err(r, HTTPD_400_BAD_REQUEST, "ssid required");
         return ESP_FAIL;
     }
     query(r, "pass", pass, sizeof(pass));
+    url_decode_pct(ssid);
+    url_decode_pct(pass);
+
+    /* SSID 最多 32 字节（UTF-8 下约 10 个汉字），WPA2 密码 8~63 字节 */
+    size_t sl = strlen(ssid), pl = strlen(pass);
+    if (sl == 0 || sl > 32) {
+        httpd_resp_send_err(r, HTTPD_400_BAD_REQUEST, "ssid must be 1..32 bytes");
+        return ESP_FAIL;
+    }
+    if (pl > 63) {
+        httpd_resp_send_err(r, HTTPD_400_BAD_REQUEST, "pass too long");
+        return ESP_FAIL;
+    }
+    ESP_LOGI(TAG, "wifi: ssid %u bytes, pass %u bytes", (unsigned)sl, (unsigned)pl);
     net_set_sta(ssid, pass);
 
     cJSON *j = cJSON_CreateObject();
