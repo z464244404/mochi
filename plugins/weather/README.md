@@ -4,6 +4,31 @@
 
 ![weather](https://raw.githubusercontent.com/z464244404/mochi/main/docs/photos/weather.jpg)
 
+## 背景
+
+`backgrounds/` 里是 16 张 480×480 的背景样例，就是打包进 `bg.bin` 的那一份（JPEG q88，平均 18 KB）：
+
+![背景总览](backgrounds/contact-sheet.jpg)
+
+| 文件 | 用于 |
+|---|---|
+| `clear-day.jpg` / `clear-day-dark.jpg` | 晴（白天）—— 白色文字要用 `-dark` 版，浅底看不清 |
+| `clear-night.jpg` | 晴（夜间） |
+| `partly-cloudy-day.jpg` / `-dark.jpg` | 多云（白天） |
+| `partly-cloudy-night.jpg` | 多云（夜间） |
+| `cloudy.jpg` | 阴 |
+| `fog.jpg` | 雾 |
+| `drizzle.jpg` | 毛毛雨 |
+| `rain.jpg` | 小 / 中雨 |
+| `overcast-rain.jpg` | 大雨 / 暴雨 |
+| `partly-cloudy-day-rain.jpg` / `-dark.jpg` | 阵雨（白天） |
+| `sleet.jpg` | 冻雨 |
+| `snow.jpg` | 雪 |
+| `thunderstorms-rain.jpg` | 雷阵雨 |
+
+换背景：把同名文件替换掉，重新跑 `python tools/pack_bg.py` 生成 `bg.bin`，
+再 `python tools/pack_assets.py` 打包烧进设备即可（详见主仓库）。
+
 ## 特性
 
 - 数据源 **Open-Meteo**，免费、免注册、无需 API key
