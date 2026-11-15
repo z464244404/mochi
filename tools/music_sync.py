@@ -90,6 +90,9 @@ async def main_async(args):
     last_key = None
     last_push = 0.0
     last_playing = None
+    last_pos = 0.0          # 同一首歌的单调基准，防止 SMTC 时间轴抖动导致回跳
+    back_ref = None         # 上一次可疑的回退位置
+    back_cnt = 0            # 连续回退次数
 
     while True:
         try:
@@ -126,10 +129,38 @@ async def main_async(args):
                 pos = dur
             if pos < 0:
                 pos = 0
+
+            # 进度防抖：
+            #  Chrome 偶尔报「非播放」状态，那时 last_updated 不参与计算，
+            #  pos 会掉回 0.3 秒，屏上闪一下 0:00。
+            #  规则：
+            #    暂停        -> 冻结在上一帧位置
+            #    回退 1 次   -> 当成抖动，钳住
+            #    回退连续 2 次 -> 认为用户拖回前面，接受
+            if not playing:
+                pos = last_pos
+            elif pos < last_pos - 2:
+                if back_ref is not None and abs(pos - back_ref) < 3:
+                    back_cnt += 1
+                else:
+                    back_ref = pos
+                    back_cnt = 1
+                if back_cnt >= 2:
+                    last_pos = pos        # 真的拖回去了
+                    back_cnt = 0
+                else:
+                    pos = last_pos        # 第一次先钳住
+            else:
+                back_cnt = 0
+                if pos > last_pos:
+                    last_pos = pos
             key = (title, artist)
 
             if key != last_key:
                 last_key = key
+                last_pos = 0.0
+                back_ref = None
+                back_cnt = 0
                 cover = await read_cover(session)
                 if cover is not None and not args.dry_run:
                     try:
@@ -164,6 +195,27 @@ def push_cover(host, im):
     http_post("http://%s/api/music/cover" % host, raw, timeout=30)
 
 
+
+# 单实例保护：两个 music_sync 同时在跑会互相覆盖进度，屏上会来回跳 0:00
+_LOCK_SOCK = None
+
+
+def acquire_single_instance(port=47890):
+    """占用一个本地端口当作锁；已被占用说明已经有一个在跑了"""
+    import socket
+
+    global _LOCK_SOCK
+    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    try:
+        sock.bind(("127.0.0.1", port))
+        sock.listen(1)
+        _LOCK_SOCK = sock
+        return True
+    except OSError:
+        sock.close()
+        return False
+
+
 def main():
     try:
         sys.stdout.reconfigure(encoding="utf-8", errors="replace")
@@ -179,6 +231,9 @@ def main():
 
     if not args.dry_run and not args.host:
         sys.exit("需要 --host，例如 --host 10.215.198.102")
+
+    if not args.dry_run and not acquire_single_instance():
+        sys.exit("已经有一个 music_sync 在跑了，先把旧的关掉（否则进度会来回跳）")
 
     try:
         asyncio.run(main_async(args))
