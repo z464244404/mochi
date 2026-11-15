@@ -1,0 +1,10 @@
+{
+  "id": "bili",
+  "name": "哔哩哔哩",
+  "version": "1.1.0",
+  "api": 1,
+  "author": "mochi",
+  "settings": [
+    {"key": "uid", "label": "B 站 UID（个人空间地址里的数字）", "type": "text", "default": ""}
+  ]
+}

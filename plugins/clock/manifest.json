@@ -1,0 +1,19 @@
+{
+  "id": "clock",
+  "name": "时钟",
+  "version": "1.2.0",
+  "api": 1,
+  "author": "mochi",
+  "settings": [
+    {"key": "style", "label": "样式", "type": "select", 
+"options": ["cute", "tech", "minimal"], "default": "cute"},
+    {"key": "seconds", "label": "秒针", "type": "select", 
+"options": ["on", "off"], "default": "on"},
+    {"key": "bg", "label": "背景颜色（极简）", "type": "color", 
+"default": "#0F1115"},
+    {"key": "hand", "label": "指针颜色（极简）", "type": "color", 
+"default": "#E8F4F2"},
+    {"key": "sec_hand", "label": "秒针颜色（极简）", "type": "color", 
+"default": "#5BE0BD"}
+  ]
+}

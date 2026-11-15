@@ -1,0 +1,15 @@
+{
+  "id": "weather",
+  "name": "天气",
+  "version": "2.5.1",
+  "api": 1,
+  "author": "mochi",
+  "settings": [
+    {"key": "city", "label": "地名（显示用）", "type": "text", 
+"default": "深圳"},
+    {"key": "lat", "label": "纬度", "type": "number", "default": "22.54"},
+    {"key": "lon", "label": "经度", "type": "number", "default": "114.06"},
+    {"key": "unit", "label": "单位", "type": "select", "options": ["c", "f"], 
+"default": "c"}
+  ]
+}

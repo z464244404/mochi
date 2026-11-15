@@ -1,0 +1,11 @@
+{
+  "id": "dfm",
+  "name": "三角洲",
+  "version": "2.0.0",
+  "api": 1,
+  "author": "mochi",
+  "settings": [
+    {"key": "hint", "label": "数据来源", "type": "text",
+     "default": "电脑上运行 python tools/df_sync.py 推送"}
+  ]
+}
