@@ -19,6 +19,7 @@ import asyncio
 import io
 import sys
 import time
+from datetime import datetime, timezone
 import urllib.parse
 import urllib.request
 
@@ -109,8 +110,22 @@ async def main_async(args):
 
             title = (props.title or "").strip()
             artist = (props.artist or "").strip()
+
+            # SMTC 的 position 只在暂停/拖动时更新，平时是冻结的；
+            # 真正进度 = position + (现在 - last_updated_time)
             pos = tl.position.total_seconds()
             dur = tl.end_time.total_seconds()
+            if playing and tl.last_updated_time is not None:
+                try:
+                    delta = (datetime.now(timezone.utc) - tl.last_updated_time).total_seconds()
+                    if 0 <= delta < 3600:    # Chrome 播放期间不更新时间轴，delta 会一直增长
+                        pos += delta
+                except Exception:
+                    pass
+            if dur > 0 and pos > dur:
+                pos = dur
+            if pos < 0:
+                pos = 0
             key = (title, artist)
 
             if key != last_key:
@@ -157,7 +172,7 @@ def main():
 
     ap = argparse.ArgumentParser(description="把正在播放的歌推到 Mochi 摆件")
     ap.add_argument("--host", help="摆件 IP（看设备『网络』屏）")
-    ap.add_argument("--interval", type=float, default=1.0, help="轮询间隔秒，默认 1")
+    ap.add_argument("--interval", type=float, default=0.5, help="轮询间隔秒，默认 0.5")
     ap.add_argument("--sync-every", type=float, default=0.0, help="(已废弃，现在每轮都推)")
     ap.add_argument("--dry-run", action="store_true", help="只打印，不推设备")
     args = ap.parse_args()

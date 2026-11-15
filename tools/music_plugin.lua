@@ -92,12 +92,9 @@ function on_draw(dt)
     ui.text(clip(artist, 22, 360), 240, ARTIST_Y, 22, 0x9AA8B8)
   end
 
-  -- 进度：本地按时间插值，电脑每 2 秒校准一次
+  -- 进度：直接用电脑推过来的 pos，不做本地插值
+  -- （插值要依赖两端时钟一致，实测会往回跳；宁可一秒一跳也别跳错）
   local elapsed = pos
-  if playing and ts > 0 then
-    local now = time.epoch()
-    if now > 1000000000 and now > ts then elapsed = pos + (now - ts) end
-  end
   if dur > 0 and elapsed > dur then elapsed = dur end
 
   local col = playing and GREEN or GREY
