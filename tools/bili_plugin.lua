@@ -53,10 +53,10 @@ local function fetch()
       next_fetch = t + 60
       return
     end
-    follower = tonumber(j.data.follower) or 0
+    follower = math.floor(tonumber(j.data.follower) or 0)
     ts = now_s()
     store.set("follower", tostring(follower))
-    store.set("following", tostring(tonumber(j.data.following) or 0))
+    store.set("following", tostring(math.floor(tonumber(j.data.following) or 0)))
     store.set("ts", tostring(ts))
     err = nil
     status = nil
@@ -82,12 +82,14 @@ function on_draw(dt)
   if not ui.bg("bili") then ui.clear(0x12141A) end
 
   if err then
-    ui.text(err, 240, 258, 29, 0xFFC86B)
+    ui.text(err, 240, 260, 29, 0xFFC86B)
     return
   end
   if status or follower <= 0 then
     return
   end
 
-  ui.text(tostring(follower), 240, 300, 106, 0xFFFFFF)
+  -- ui.text 的 y 是「文字竖直中心」，不是基线。
+  -- 版式给数字留的槽是 y 220~300（基线 300），中心就是 260。
+  ui.text(string.format("%d", follower), 240, 260, 106, 0xFFFFFF)
 end

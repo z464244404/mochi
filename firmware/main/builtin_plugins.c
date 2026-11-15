@@ -476,10 +476,10 @@ static const char *BILI_LUA =
     "      next_fetch = t + 60\n"
     "      return\n"
     "    end\n"
-    "    follower = tonumber(j.data.follower) or 0\n"
+    "    follower = math.floor(tonumber(j.data.follower) or 0)\n"
     "    ts = now_s()\n"
     "    store.set(\"follower\", tostring(follower))\n"
-    "    store.set(\"following\", tostring(tonumber(j.data.following) or 0))\n"
+    "    store.set(\"following\", tostring(math.floor(tonumber(j.data.following) or 0)))\n"
     "    store.set(\"ts\", tostring(ts))\n"
     "    err = nil\n"
     "    status = nil\n"
@@ -505,14 +505,16 @@ static const char *BILI_LUA =
     "  if not ui.bg(\"bili\") then ui.clear(0x12141A) end\n"
     "\n"
     "  if err then\n"
-    "    ui.text(err, 240, 258, 29, 0xFFC86B)\n"
+    "    ui.text(err, 240, 260, 29, 0xFFC86B)\n"
     "    return\n"
     "  end\n"
     "  if status or follower <= 0 then\n"
     "    return\n"
     "  end\n"
     "\n"
-    "  ui.text(tostring(follower), 240, 300, 106, 0xFFFFFF)\n"
+    "  -- ui.text 的 y 是「文字竖直中心」，不是基线。\n"
+    "  -- 版式给数字留的槽是 y 220~300（基线 300），中心就是 260。\n"
+    "  ui.text(string.format(\"%d\", follower), 240, 260, 106, 0xFFFFFF)\n"
     "end\n"
     ;
 
@@ -560,7 +562,7 @@ static const char *file_content(const builtin_plugin_t *p, const char *name)
 
 static const builtin_plugin_t BUILTINS[] = {
     {"clock", "时钟（cute / tech / minimal）", "1.1.0", CLOCK_FILES},
-    {"bili", "哔哩哔哩", "1.2.0", BILI_FILES},
+    {"bili", "哔哩哔哩", "1.3.0", BILI_FILES},
     {"dfm", "三角洲", "2.0.0", DFM_FILES},
     {"weather", "天气（实时 + 未来三天）", "2.5.1", WEATHER_FILES},
     {NULL, NULL, NULL, NULL},

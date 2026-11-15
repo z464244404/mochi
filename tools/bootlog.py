@@ -1,7 +1,7 @@
 import time
 import serial
 
-ser = serial.Serial('COM11', 115200, timeout=0.2)
+ser = serial.Serial('COM10', 115200, timeout=0.2)
 # esptool 的重置时序：DTR 控制 GPIO0，RTS 控制 EN
 ser.dtr = False
 ser.rts = True      # EN low -> reset
@@ -12,7 +12,7 @@ ser.dtr = False
 
 t0 = time.time()
 buf = b''
-while time.time() - t0 < 40:
+while time.time() - t0 < 20:
     chunk = ser.read(4096)
     if chunk:
         buf += chunk
