@@ -32,6 +32,15 @@ def main():
         im.save(b, "JPEG", quality=QUALITY, subsampling=2, optimize=True)
         blobs.append((name, im.size[0], im.size[1], b.getvalue()))
 
+    # 插件专用背景：fan-bg/png/fan-bg.png 打包成 "bili"（B 站粉丝数那一屏）
+    fan = os.path.join(ROOT, "fan-bg", "png", "fan-bg.png")
+    if os.path.exists(fan):
+        im = Image.open(fan).convert("RGB")
+        b = io.BytesIO()
+        im.save(b, "JPEG", quality=QUALITY, subsampling=2, optimize=True)
+        blobs.append(("bili", im.size[0], im.size[1], b.getvalue()))
+        print("  + bili (fan-bg.png, %dx%d)" % im.size)
+
     header = 8 + len(blobs) * (28 + 16)
     off = header
     entries = []

@@ -20,6 +20,8 @@ import zlib
 import numpy as np
 from PIL import Image, ImageDraw, ImageFilter, ImageFont
 
+from bili_logo import mask as logo_mask
+
 W = H = 480
 S = 2                      # 矢量层 2 倍超采样，缩回去才没有锯齿
 W2, H2 = W * S, H * S
@@ -110,38 +112,30 @@ def draw_ring(d, alpha=70):
                fill=(251, 114, 153, 120 if major else 60), width=int((1.3 if major else 1.0) * S))
 
 
-def draw_tv(d, cx=240, cy=118):
-    """小电视：圆角机身 + 两根天线 + 两只眼睛。"""
-    w, h, r = 112, 84, 24
-    box = [sc(cx - w / 2), sc(cy - h / 2), sc(cx + w / 2), sc(cy + h / 2)]
-    d.rounded_rectangle(box, radius=sc(r), fill=(251, 114, 153, 26),
-                        outline=(251, 114, 153, 205), width=int(3 * S))
-    # 天线
-    for dx in (-1, 1):
-        x0, y0 = cx + dx * 30, cy - h / 2
-        x1, y1 = cx + dx * 52, cy - h / 2 - 30
-        d.line([sc(x0), sc(y0), sc(x1), sc(y1)], fill=(251, 114, 153, 190), width=int(3.2 * S))
-        d.ellipse([sc(x1) - 4 * S, sc(y1) - 4 * S, sc(x1) + 4 * S, sc(y1) + 4 * S],
-                  fill=(251, 114, 153, 220))
-    # 眼睛
-    for dx in (-1, 1):
-        ex, ey = cx + dx * 22, cy - 2
-        d.rounded_rectangle([sc(ex - 8), sc(ey - 13), sc(ex + 8), sc(ey + 13)],
-                            radius=sc(7), fill=(251, 114, 153, 225))
+def draw_logo(layer, cx=240, cy=112, size=104):
+    """B 站官方 18x18 图标，等比放大后上色（矢量光栅化，边缘干净）。
+
+    layer 是 2 倍超采样的画布，所以尺寸和落点都要乘 S。
+    """
+    px = int(size * S)
+    m = logo_mask(px, ss=3)
+    tint = Image.new("RGBA", (px, px), PINK + (255,))
+    tint.putalpha(m.point(lambda v: int(v * 0.96)))
+    layer.alpha_composite(tint, (int(sc(cx - size / 2.0)), int(sc(cy - size / 2.0))))
 
 
 def draw_text_layer(layer, with_text=True):
     d = ImageDraw.Draw(layer)
 
-    # 机身外的一圈柔光，让电视有「亮着」的感觉
+    # 机身外的一圈柔光，让 logo 有「亮着」的感觉
     glow_l = Image.new("RGBA", (W2, H2), (0, 0, 0, 0))
-    ImageDraw.Draw(glow_l).ellipse([sc(240 - 92), sc(118 - 74), sc(240 + 92), sc(118 + 74)],
-                                   fill=(251, 114, 153, 46))
-    glow_l = glow_l.filter(ImageFilter.GaussianBlur(22 * S))
+    ImageDraw.Draw(glow_l).ellipse([sc(240 - 84), sc(116 - 76), sc(240 + 84), sc(116 + 76)],
+                                   fill=(251, 114, 153, 42))
+    glow_l = glow_l.filter(ImageFilter.GaussianBlur(20 * S))
     layer.alpha_composite(glow_l)
 
     draw_ring(d)
-    draw_tv(d)
+    draw_logo(layer)
 
     if not with_text:
         return

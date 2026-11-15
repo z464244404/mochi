@@ -39,11 +39,28 @@
 
 | 元素 | 位置 | 说明 |
 |---|---|---|
-| 小电视图标 | 中心 (240, 118)，112×84 | 粉色描边 |
+| **B 站 logo** | 中心 (240, 112)，**104×104** | 官方 18×18 SVG 图标，色 `#fb7299` |
 | `BILIBILI` 字标 | 基线 y=186，居中 | 逐字加了字距 |
 | `粉丝` 标签 | 基线 y=366，居中，33px | 已画在图上 |
 | `FANS` 小字 | 基线 y=396 | 青色 |
 | 外圈刻度环 | r=214 | 左右两侧 |y−260|<74 处自动留空，不压数字 |
+
+### logo 用的是官网那个 SVG
+
+不是手绘的，是 bilibili.com 顶栏那个 18×18 图标的 `path` 原样拿过来光栅化的：
+
+```
+<svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+  <path fill-rule="evenodd" d="M3.73252 2.67094C..." fill="currentColor"/>
+</svg>
+```
+
+环境里没有 cairosvg，所以 `tools/bili_logo.py` 自己解析 path：只用到 `M/C/L/H/V/Z` 六个绝对指令，
+三次贝塞尔拆成 24 段折线；`fill-rule=evenodd` 用「每条子路径分别填充、再逐像素异或」实现——
+这样机身被挖空、眼睛又填回来，和浏览器渲染一致。4 倍超采样后缩小，边缘是干净的。
+
+换 logo 只要改 `bili_logo.py` 顶部的 `PATH` 常量，重跑 `gen.py` 即可。
+（图标是 B 站的注册商标，自己设备上玩玩没问题，对外发布要注意。）
 
 ---
 
@@ -80,7 +97,7 @@ fan-bg/
 ├─ jpg/                    同图 JPEG q90（每张 ~30KB）
 ├─ rgb565/*.bin            裸 RGB565 小端，450KB/张，不用解码器
 ├─ preview/                版式图、5/7/3 位模拟、plain 版模拟
-└─ tools/                  gen.py（渲染）、preview.py（模拟+标注）
+└─ tools/                  gen.py（渲染）、bili_logo.py（SVG 光栅化）、preview.py（模拟+标注）
 ```
 
 `plain` 版只是去掉了文字，数字槽位置完全一样。

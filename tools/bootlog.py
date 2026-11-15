@@ -12,7 +12,7 @@ ser.dtr = False
 
 t0 = time.time()
 buf = b''
-while time.time() - t0 < 14:
+while time.time() - t0 < 40:
     chunk = ser.read(4096)
     if chunk:
         buf += chunk

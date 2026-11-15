@@ -1,9 +1,9 @@
--- 哔哩哔哩粉丝数（官方公开接口 x/relation/stat）
--- 背景图：/sdcard/fonts? 不，背景走 bg.bin 里的 "bili"（还没打进去就退化成渐变色）
+-- 哔哩哔哩粉丝数：背景（logo / 粉丝 / FANS）已经烘焙在 fan-bg.png 里，
+-- 这里只负责把数字画到版式留出来的槽位：居中，基线 y=300，106px，白色。
 local t = 0
 local next_fetch = 0
 local err, status
-local uid, follower, following, ts
+local uid, follower, ts
 
 local API = "https://api.bilibili.com/x/relation/stat?vmid="
 
@@ -18,50 +18,48 @@ local function text_or(v, def)
   return v
 end
 
-local function load()
-  uid = store.get("uid") or ""
-  follower = tonumber(store.get("follower") or "0") or 0
-  following = tonumber(store.get("following") or "0") or 0
-  ts = tonumber(store.get("ts") or "0") or 0
+-- NTP 没同步前 time.epoch() 是 0，直接拿去算「多久没更新」会得出负数，
+-- 必须把「时间不可信」当成「数据过期」
+local function now_s()
+  local e = time.epoch()
+  return (e > 1000000000) and e or 0
 end
 
--- 1438247 -> "143.8万"
-local function big(n)
-  n = tonumber(n) or 0
-  if n >= 100000000 then return string.format("%.2f", n / 100000000), "亿" end
-  if n >= 10000 then return string.format("%.1f", n / 10000), "万" end
-  return tostring(n), ""
+local function load()
+  -- 注意：uid 来自插件设置（app.get），不能从 store 读，
+  -- 否则会把 on_start 里设好的值覆盖成空
+  follower = tonumber(store.get("follower") or "0") or 0
+  ts = tonumber(store.get("ts") or "0") or 0
 end
 
 local function fetch()
   if uid == "" then
-    err = "请填写 UID"
+    err = "NO UID"
     next_fetch = t + 30
     return
   end
   if not net.up() then
-    status = "等待网络"
+    status = "NO NET"
     next_fetch = t + 3
     return
   end
 
-  status = "读取中"
   err = nil
+  next_fetch = t + 15 -- 请求在飞的时候别每帧重复发
   http.get(API .. uid, HEADERS, function(st, body)
-    status = nil
     local j = json.decode(body or "")
     if not j or tonumber(j.code) ~= 0 or not j.data then
-      err = "接口 code=" .. tostring(j and j.code or st)
+      err = "ERR " .. tostring(j and j.code or st)
       next_fetch = t + 60
       return
     end
     follower = tonumber(j.data.follower) or 0
-    following = tonumber(j.data.following) or 0
-    ts = time.epoch()
+    ts = now_s()
     store.set("follower", tostring(follower))
-    store.set("following", tostring(following))
+    store.set("following", tostring(tonumber(j.data.following) or 0))
     store.set("ts", tostring(ts))
     err = nil
+    status = nil
     next_fetch = t + 300
     log("bili " .. uid .. " followers " .. follower)
   end)
@@ -69,50 +67,27 @@ end
 
 function on_start()
   uid = text_or(app.get("uid"), "")
+  uid = uid:gsub("%s", "")
   load()
-  local stale = (time.epoch() - ts) > 300
+  local e = now_s()
+  local stale = (e == 0) or (ts == 0) or (e - ts > 300)
   next_fetch = stale and 0 or (t + 300)
-end
-
--- 背景：有 "bili" 背景图就用，没有就自己画一层
-local function draw_bg()
-  if ui.bg("bili") then return end
-  ui.clear(0x0E1014)
-  ui.circle(240, 168, 176, 0x1A3A414F)
-  ui.circle(240, 168, 130, 0x1A4A5568)
 end
 
 function on_draw(dt)
   t = t + dt
   if t > next_fetch then fetch() end
 
-  draw_bg()
-
-  ui.text("哔哩哔哩", 240, 62, 29, 0xFB7299)
+  -- 背景是打包进 bg.bin 的 "bili"（fan-bg.png）
+  if not ui.bg("bili") then ui.clear(0x12141A) end
 
   if err then
-    ui.text(err, 240, 230, 29, 0xffc86b)
-    ui.text("插件详情里填 UID", 240, 276, 22, 0x6b7785)
+    ui.text(err, 240, 258, 29, 0xFFC86B)
     return
   end
-  if status then
-    ui.text(status, 240, 230, 29, 0xdfe8f0)
+  if status or follower <= 0 then
     return
   end
 
-  local s, unit = big(follower)
-  local w = ui.measure(s, 106)
-  ui.text(s, 240 - (unit ~= "" and 18 or 0), 158, 106, 0xF4F7F8)
-  if unit ~= "" then
-    ui.text(unit, 240 - (unit ~= "" and 18 or 0) + w * 0.5 + 18, 184, 29, 0xFB7299)
-  end
-  ui.text("粉丝", 240, 224, 29, 0x8fa0b4)
-
-  ui.text("关注 " .. tostring(following), 240, 300, 29, 0xB8C4D0)
-  ui.text("UID " .. uid, 240, 352, 22, 0x5E6A78)
-
-  local age = time.epoch() - ts
-  if ts > 0 and age > 1800 then
-    ui.text(string.format("%d 分钟前", math.floor(age / 60)), 240, 404, 22, 0x6b7785)
-  end
+  ui.text(tostring(follower), 240, 300, 106, 0xFFFFFF)
 end
