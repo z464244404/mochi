@@ -18,6 +18,7 @@ idf_component_register(
         "icons.c"
         "fontpack.c"
         "cover.c"
+        "music_state.c"
         "bg.c"
         "imu.c"
         "rtc.c"

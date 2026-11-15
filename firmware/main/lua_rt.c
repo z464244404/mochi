@@ -16,6 +16,7 @@
 #include "icons.h"
 #include "bg.h"
 #include "cover.h"
+#include "music_state.h"
 #include "lauxlib.h"
 #include "lua.h"
 #include "lualib.h"
@@ -401,6 +402,35 @@ static int l_cover(lua_State *L_)
     return 1;
 }
 
+/* music.get() —— 当前播放状态（电脑推过来的，纯内存） */
+static int l_music_get(lua_State *L_)
+{
+    const music_state_t *m = music_get();
+    if (!m) {
+        lua_pushnil(L_);
+        return 1;
+    }
+    lua_createtable(L_, 0, 6);
+    lua_pushstring(L_, m->title);
+    lua_setfield(L_, -2, "title");
+    lua_pushstring(L_, m->artist);
+    lua_setfield(L_, -2, "artist");
+    lua_pushnumber(L_, m->pos);
+    lua_setfield(L_, -2, "pos");
+    lua_pushnumber(L_, m->dur);
+    lua_setfield(L_, -2, "dur");
+    lua_pushboolean(L_, m->playing);
+    lua_setfield(L_, -2, "playing");
+    lua_pushinteger(L_, (lua_Integer)m->ts);
+    lua_setfield(L_, -2, "ts");
+    return 1;
+}
+
+static const luaL_Reg music_funcs[] = {
+    {"get", l_music_get},
+    {NULL, NULL},
+};
+
 static const luaL_Reg ui_funcs[] = {
     {"clear", l_clear},   {"rect", l_rect},     {"round_rect", l_round_rect},
     {"circle", l_circle}, {"ring", l_ring},     {"arc", l_arc},
@@ -666,6 +696,9 @@ static void register_api(lua_State *L_)
 
     luaL_newlib(L_, app_funcs);
     lua_setglobal(L_, "app");
+
+    luaL_newlib(L_, music_funcs);
+    lua_setglobal(L_, "music");
 
     luaL_newlib(L_, json_funcs);
     lua_setglobal(L_, "json");

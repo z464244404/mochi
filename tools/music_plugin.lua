@@ -1,30 +1,34 @@
 -- 音乐副屏：电脑上的 music_sync.py 把系统正在播放的歌推过来
+-- 数据走内存（music.get()），不写 SD 卡，所以可以每 2 秒推一次
 -- 版式严格按 music-bg/README.md：
 --   封面 圆心(240,150) 直径240 / 曲名 基线310 29px / 歌手 基线344 22px
 --   进度条 x100→380 y378 / 时间 基线404 22px，左贴100、右贴380
--- 注意 ui.text 的 y 是「竖直中心」：29px 基线 = y+11，22px 基线 = y+8.5
+-- ui.text 的 y 是「竖直中心」：29px 基线 = y+11，22px 基线 = y+8.5
 local t = 0
-local last_reload = -1
 local title, artist, pos, dur, playing, ts
-local angle = 0          -- 封面旋转角度（度）
-local SPEED = 25         -- 播放时每秒转多少度（360/25 ≈ 14.4 秒一圈）
+local angle = 0
+local SPEED = 25           -- 播放时转速：度/秒（360/25 ≈ 14.4 秒一圈）
+local bgname = "music-vinyl"
 
 local GREEN = 0x5BE0BD
 local GREY = 0x5A6270
 local TRACK = 0x3E444E
 
-local TITLE_Y = 299   -- 基线 310
-local ARTIST_Y = 336  -- 基线 344
-local TIME_Y = 396    -- 基线 404
+local TITLE_Y = 299
+local ARTIST_Y = 336
+local TIME_Y = 396
 local BAR_X0, BAR_X1, BAR_Y = 100, 380, 378
 
-local function load()
-  title = store.get("title") or ""
-  artist = store.get("artist") or ""
-  pos = tonumber(store.get("pos") or "0") or 0
-  dur = tonumber(store.get("dur") or "0") or 0
-  playing = (store.get("playing") or "0") == "1"
-  ts = tonumber(store.get("ts") or "0") or 0
+local function read()
+  local m = music.get()
+  if not m then return false end
+  title = m.title or ""
+  artist = m.artist or ""
+  pos = tonumber(m.pos) or 0
+  dur = tonumber(m.dur) or 0
+  playing = m.playing and true or false
+  ts = tonumber(m.ts) or 0
+  return title ~= ""
 end
 
 local function clip(s, size, maxw)
@@ -46,7 +50,10 @@ local function mmss(sec)
 end
 
 function on_start()
-  load()
+  local style = app.get("bg")
+  if style == nil or style == "" then style = "vinyl" end
+  bgname = "music-" .. style
+  read()
 end
 
 local function draw_idle()
@@ -57,20 +64,15 @@ end
 
 function on_draw(dt)
   t = t + dt
-  if t - last_reload > 2 then
-    last_reload = t
-    store.reload()
-    load()
-  end
+  read()
 
-  if not ui.bg("music") then ui.clear(0x0B0D12) end
+  if not ui.bg(bgname) then ui.clear(0x0B0D12) end
 
   if title == "" then
     draw_idle()
     return
   end
 
-  -- 唱片旋转：播放时转，暂停就停住（角度保留）
   if playing then
     angle = angle + dt * SPEED
     if angle >= 360 then angle = angle - 360 end
@@ -80,7 +82,7 @@ function on_draw(dt)
     ui.circle(240, 150, 120, 0x1A1F27)
   end
 
-  -- 唱片中心的小孔
+  -- 唱片中心轴孔
   ui.circle(240, 150, 9, 0x14171C)
   ui.ring(240, 150, 9, 1, 0x2C3542)
 
@@ -89,6 +91,7 @@ function on_draw(dt)
     ui.text(clip(artist, 22, 360), 240, ARTIST_Y, 22, 0x9AA8B8)
   end
 
+  -- 进度：本地按时间插值，电脑每 2 秒校准一次
   local elapsed = pos
   if playing and ts > 0 then
     local now = time.epoch()

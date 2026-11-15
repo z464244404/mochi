@@ -124,17 +124,17 @@ async def main_async(args):
                 print("  [换歌] %s - %s  (%s)" % (title, artist, "封面已传" if cover is not None else "无封面"))
                 last_push = 0
 
-            if playing != last_playing or time.time() - last_push > args.sync_every:
-                if not args.dry_run:
-                    try:
-                        push_meta(args.host, title, artist, pos, dur, playing)
-                    except Exception as e:
-                        print("× 推送失败:", e)
-                last_push = time.time()
-                last_playing = playing
-                if args.dry_run:
-                    print("  %s %d:%02d/%d:%02d" %
-                          ("播放" if playing else "暂停", pos // 60, pos % 60, dur // 60, dur % 60))
+            # 位置每秒都在变，每轮都推（只写设备内存，不伤卡）
+            if not args.dry_run:
+                try:
+                    push_meta(args.host, title, artist, pos, dur, playing)
+                except Exception as e:
+                    print("× 推送失败:", e)
+            last_push = time.time()
+            last_playing = playing
+            if args.dry_run:
+                print("  %s %d:%02d/%d:%02d" %
+                      ("播放" if playing else "暂停", pos // 60, pos % 60, dur // 60, dur % 60))
 
         except KeyboardInterrupt:
             raise
@@ -157,8 +157,8 @@ def main():
 
     ap = argparse.ArgumentParser(description="把正在播放的歌推到 Mochi 摆件")
     ap.add_argument("--host", help="摆件 IP（看设备『网络』屏）")
-    ap.add_argument("--interval", type=float, default=2.0, help="轮询间隔秒，默认 2")
-    ap.add_argument("--sync-every", type=float, default=10.0, help="进度回推间隔秒，默认 10")
+    ap.add_argument("--interval", type=float, default=1.0, help="轮询间隔秒，默认 1")
+    ap.add_argument("--sync-every", type=float, default=0.0, help="(已废弃，现在每轮都推)")
     ap.add_argument("--dry-run", action="store_true", help="只打印，不推设备")
     args = ap.parse_args()
 

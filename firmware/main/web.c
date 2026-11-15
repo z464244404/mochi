@@ -22,6 +22,7 @@
 #include "plugins.h"
 #include "sd.h"
 #include "fontpack.h"
+#include "music_state.h"
 #include "www.h"
 
 static const char *TAG = "web";
@@ -427,10 +428,11 @@ static esp_err_t shot_bmp_get(httpd_req_t *r)
             line[x * 3 + 1] = (uint8_t)(((c >> 5) & 0x3F) << 2);   /* G */
             line[x * 3 + 2] = (uint8_t)(((c >> 11) & 0x1F) << 3);  /* R */
         }
-        httpd_resp_send_chunk(r, (const char *)line, row);
+        if (httpd_resp_send_chunk(r, (const char *)line, row) != ESP_OK) break;
     }
     heap_caps_free(line);
     httpd_resp_send_chunk(r, NULL, 0);
+    /* 中途失败也必须恢复渲染，否则屏幕会永远停在暂停态 */
     mochi_pause_render(false);
     return ESP_OK;
 }
@@ -451,33 +453,20 @@ static esp_err_t music_post(httpd_req_t *r)
     url_decode(title);
     url_decode(artist);
 
-    cJSON *o = cJSON_CreateObject();
-    if (!o) return ESP_OK;
-    cJSON_AddStringToObject(o, "title", title);
-    cJSON_AddStringToObject(o, "artist", artist);
-    cJSON_AddStringToObject(o, "pos", pos);
-    cJSON_AddStringToObject(o, "dur", dur);
-    cJSON_AddStringToObject(o, "playing", playing);
-    cJSON_AddStringToObject(o, "ts", ts);
-
-    char *js = cJSON_PrintUnformatted(o);
-    bool ok = false;
-    if (js) {
-        FILE *f = sd_open_write("/sdcard/plugins/music/data.json", 3);
-        if (f) {
-            ok = fwrite(js, 1, strlen(js), f) == strlen(js);
-            fclose(f);
-        }
-        cJSON_free(js);
-    }
-    cJSON_Delete(o);
+    music_state_t st;
+    memset(&st, 0, sizeof(st));
+    snprintf(st.title, sizeof(st.title), "%s", title);
+    snprintf(st.artist, sizeof(st.artist), "%s", artist);
+    st.pos = (float)atof(pos);
+    st.dur = (float)atof(dur);
+    st.playing = (playing[0] == '1');
+    st.ts = (int64_t)atoll(ts);
+    music_set(&st);
 
     cJSON *res = cJSON_CreateObject();
-    if (res) {
-        cJSON_AddBoolToObject(res, "ok", ok);
-        return send_json(r, res);
-    }
-    return ESP_OK;
+    if (!res) return ESP_OK;
+    cJSON_AddBoolToObject(res, "ok", true);
+    return send_json(r, res);
 }
 
 /* POST /api/music/cover —— 裸 RGB565（240x240x2 = 115200 字节） */

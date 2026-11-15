@@ -42,14 +42,21 @@ def main():
         print("  + bili (fan-bg.png, %dx%d)" % im.size)
 
 
-    # 音乐插件背景：music-bg/png/vinyl.png -> "music"（黑胶纹路，封面正好在中间）
-    vinyl = os.path.join(ROOT, "music-bg", "png", "vinyl.png")
-    if os.path.exists(vinyl):
-        im = Image.open(vinyl).convert("RGB")
+    # 音乐插件背景：music-bg/png/*.png -> "music-<style>"，另外 "music" 指向 vinyl
+    music_dir = os.path.join(ROOT, "music-bg", "png")
+    styles = ["vinyl", "neon", "sunset", "mint", "ocean"]
+    for style in styles:
+        path = os.path.join(music_dir, style + ".png")
+        if not os.path.exists(path):
+            continue
+        im = Image.open(path).convert("RGB")
         b = io.BytesIO()
         im.save(b, "JPEG", quality=QUALITY, subsampling=2, optimize=True)
-        blobs.append(("music", im.size[0], im.size[1], b.getvalue()))
-        print("  + music (vinyl.png, %dx%d)" % im.size)
+        data = b.getvalue()
+        blobs.append(("music-" + style, im.size[0], im.size[1], data))
+        if style == "vinyl":
+            blobs.append(("music", im.size[0], im.size[1], data))  # 旧名字兼容
+        print("  + music-%s (%dx%d, %d KB)" % (style, im.size[0], im.size[1], len(data) // 1024))
 
     header = 8 + len(blobs) * (28 + 16)
     off = header
