@@ -411,7 +411,7 @@ static const char *BILI_MANIFEST =
     "{\n"
     "  \"id\": \"bili\",\n"
     "  \"name\": \"哔哩哔哩\",\n"
-    "  \"version\": \"1.1.0\",\n"
+    "  \"version\": \"1.3.0\",\n"
     "  \"api\": 1,\n"
     "  \"author\": \"mochi\",\n"
     "  \"settings\": [\n"
@@ -677,7 +677,7 @@ static const char *file_content(const builtin_plugin_t *p, const char *name)
 }
 
 static const builtin_plugin_t BUILTINS[] = {
-    {"clock", "时钟（cute / tech / minimal）", "1.1.0", CLOCK_FILES},
+    {"clock", "时钟（cute / tech / minimal）", "1.2.0", CLOCK_FILES},
     {"music", "音乐", "1.0.0", MUSIC_FILES},
     {"bili", "哔哩哔哩", "1.3.0", BILI_FILES},
     {"dfm", "三角洲", "2.0.0", DFM_FILES},
