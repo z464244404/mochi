@@ -463,23 +463,26 @@ static void http_worker(void *arg)
     }
 }
 
+/* http.get(url[, headers], cb) */
 static int l_http_get(lua_State *L_)
 {
     const char *url = luaL_checkstring(L_, 1);
-    luaL_checktype(L_, 2, LUA_TFUNCTION);
+    int cb_idx = lua_gettop(L_);
+    luaL_checktype(L_, cb_idx, LUA_TFUNCTION);
+    int hdr_idx = (cb_idx >= 3) ? 2 : 0;
     if (strlen(url) > URL_MAX) {
         lua_pushboolean(L_, 0);
         return 1;
     }
 
-    lua_pushvalue(L_, 2);
+    lua_pushvalue(L_, cb_idx);
     int ref = luaL_ref(L_, LUA_REGISTRYINDEX);
 
     /* 同一个 URL 两分钟内 повторно — 直接回调缓存，不占网络 */
     if (s_cache_body && s_cache_url[0] && !strcmp(url, s_cache_url) &&
         esp_timer_get_time() - s_cache_us < CACHE_TTL_US) {
         luaL_unref(L_, LUA_REGISTRYINDEX, ref);
-        lua_pushvalue(L_, 2);
+        lua_pushvalue(L_, cb_idx);
         lua_pushinteger(L_, s_cache_status);
         lua_pushstring(L_, s_cache_body);
         if (lua_pcall(L_, 2, 0, 0) != LUA_OK) lua_pop(L_, 1);
@@ -492,6 +495,19 @@ static int l_http_get(lua_State *L_)
     snprintf(req.url, sizeof(req.url), "%s", url);
     req.ref = ref;
     req.gen = s_gen;
+
+    if (hdr_idx) {
+        lua_pushnil(L);
+        while (lua_next(L, hdr_idx) != 0 && req.nhdr < HTTP_HDR_MAX) {
+            if (lua_type(L, -2) == LUA_TSTRING && lua_type(L, -1) == LUA_TSTRING) {
+                snprintf(req.hdr[req.nhdr], HTTP_HDR_LEN, "%s: %s", lua_tostring(L, -2),
+                         lua_tostring(L, -1));
+                req.nhdr++;
+            }
+            lua_pop(L, 1);
+        }
+    }
+
     if (!s_req_q || xQueueSend(s_req_q, &req, 0) != pdTRUE) {
         luaL_unref(L_, LUA_REGISTRYINDEX, ref);
         lua_pushboolean(L_, 0);

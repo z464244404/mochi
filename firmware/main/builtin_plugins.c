@@ -407,7 +407,146 @@ static const char *DFM_LUA =
     "end\n"
     ;
 
+static const char *BILI_MANIFEST =
+    "{\n"
+    "  \"id\": \"bili\",\n"
+    "  \"name\": \"哔哩哔哩\",\n"
+    "  \"version\": \"1.0.0\",\n"
+    "  \"api\": 1,\n"
+    "  \"author\": \"mochi\",\n"
+    "  \"settings\": [\n"
+    "    {\"key\": \"uid\", \"label\": \"B 站 UID（个人空间地址里的数字）\", \"type\": \"text\", \"default\": \"\"}\n"
+    "  ]\n"
+    "}\n"
+    ;
+
+static const char *BILI_LUA =
+    "-- 哔哩哔哩粉丝数（官方公开接口 x/relation/stat）\n"
+    "-- 背景图：/sdcard/fonts? 不，背景走 bg.bin 里的 \"bili\"（还没打进去就退化成渐变色）\n"
+    "local t = 0\n"
+    "local next_fetch = 0\n"
+    "local err, status\n"
+    "local uid, follower, following, ts\n"
+    "\n"
+    "local API = \"https://api.bilibili.com/x/relation/stat?vmid=\"\n"
+    "\n"
+    "local HEADERS = {\n"
+    "  [\"User-Agent\"] = \"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/126 Safari/537.36\",\n"
+    "  [\"Referer\"] = \"https://www.bilibili.com/\",\n"
+    "  [\"Accept\"] = \"application/json\"\n"
+    "}\n"
+    "\n"
+    "local function text_or(v, def)\n"
+    "  if v == nil or v == \"\" then return def end\n"
+    "  return v\n"
+    "end\n"
+    "\n"
+    "local function load()\n"
+    "  uid = store.get(\"uid\") or \"\"\n"
+    "  follower = tonumber(store.get(\"follower\") or \"0\") or 0\n"
+    "  following = tonumber(store.get(\"following\") or \"0\") or 0\n"
+    "  ts = tonumber(store.get(\"ts\") or \"0\") or 0\n"
+    "end\n"
+    "\n"
+    "-- 1438247 -> \"143.8万\"\n"
+    "local function big(n)\n"
+    "  n = tonumber(n) or 0\n"
+    "  if n >= 100000000 then return string.format(\"%.2f\", n / 100000000), \"亿\" end\n"
+    "  if n >= 10000 then return string.format(\"%.1f\", n / 10000), \"万\" end\n"
+    "  return tostring(n), \"\"\n"
+    "end\n"
+    "\n"
+    "local function fetch()\n"
+    "  if uid == \"\" then\n"
+    "    err = \"请填写 UID\"\n"
+    "    next_fetch = t + 30\n"
+    "    return\n"
+    "  end\n"
+    "  if not net.up() then\n"
+    "    status = \"等待网络\"\n"
+    "    next_fetch = t + 3\n"
+    "    return\n"
+    "  end\n"
+    "\n"
+    "  status = \"读取中\"\n"
+    "  err = nil\n"
+    "  http.get(API .. uid, HEADERS, function(st, body)\n"
+    "    status = nil\n"
+    "    local j = json.decode(body or \"\")\n"
+    "    if not j or tonumber(j.code) ~= 0 or not j.data then\n"
+    "      err = \"接口 code=\" .. tostring(j and j.code or st)\n"
+    "      next_fetch = t + 60\n"
+    "      return\n"
+    "    end\n"
+    "    follower = tonumber(j.data.follower) or 0\n"
+    "    following = tonumber(j.data.following) or 0\n"
+    "    ts = time.epoch()\n"
+    "    store.set(\"follower\", tostring(follower))\n"
+    "    store.set(\"following\", tostring(following))\n"
+    "    store.set(\"ts\", tostring(ts))\n"
+    "    err = nil\n"
+    "    next_fetch = t + 300\n"
+    "    log(\"bili \" .. uid .. \" followers \" .. follower)\n"
+    "  end)\n"
+    "end\n"
+    "\n"
+    "function on_start()\n"
+    "  uid = text_or(app.get(\"uid\"), \"\")\n"
+    "  load()\n"
+    "  local stale = (time.epoch() - ts) > 300\n"
+    "  next_fetch = stale and 0 or (t + 300)\n"
+    "end\n"
+    "\n"
+    "-- 背景：有 \"bili\" 背景图就用，没有就自己画一层\n"
+    "local function draw_bg()\n"
+    "  if ui.bg(\"bili\") then return end\n"
+    "  ui.clear(0x0E1014)\n"
+    "  ui.circle(240, 168, 176, 0x1A3A414F)\n"
+    "  ui.circle(240, 168, 130, 0x1A4A5568)\n"
+    "end\n"
+    "\n"
+    "function on_draw(dt)\n"
+    "  t = t + dt\n"
+    "  if t > next_fetch then fetch() end\n"
+    "\n"
+    "  draw_bg()\n"
+    "\n"
+    "  ui.text(\"哔哩哔哩\", 240, 62, 29, 0xFB7299)\n"
+    "\n"
+    "  if err then\n"
+    "    ui.text(err, 240, 230, 29, 0xffc86b)\n"
+    "    ui.text(\"插件详情里填 UID\", 240, 276, 22, 0x6b7785)\n"
+    "    return\n"
+    "  end\n"
+    "  if status then\n"
+    "    ui.text(status, 240, 230, 29, 0xdfe8f0)\n"
+    "    return\n"
+    "  end\n"
+    "\n"
+    "  local s, unit = big(follower)\n"
+    "  local w = ui.measure(s, 106)\n"
+    "  ui.text(s, 240 - (unit ~= \"\" and 18 or 0), 158, 106, 0xF4F7F8)\n"
+    "  if unit ~= \"\" then\n"
+    "    ui.text(unit, 240 - (unit ~= \"\" and 18 or 0) + w * 0.5 + 18, 184, 29, 0xFB7299)\n"
+    "  end\n"
+    "  ui.text(\"粉丝\", 240, 224, 29, 0x8fa0b4)\n"
+    "\n"
+    "  ui.text(\"关注 \" .. tostring(following), 240, 300, 29, 0xB8C4D0)\n"
+    "  ui.text(\"UID \" .. uid, 240, 352, 22, 0x5E6A78)\n"
+    "\n"
+    "  local age = time.epoch() - ts\n"
+    "  if ts > 0 and age > 1800 then\n"
+    "    ui.text(string.format(\"%d 分钟前\", math.floor(age / 60)), 240, 404, 22, 0x6b7785)\n"
+    "  end\n"
+    "end\n"
+    ;
+
 static const builtin_file_t CLOCK_FILES[] = {
+    {"manifest.json", NULL},
+    {"main.lua", NULL},
+};
+
+static const builtin_file_t BILI_FILES[] = {
     {"manifest.json", NULL},
     {"main.lua", NULL},
 };
@@ -429,6 +568,10 @@ static const char *file_content(const builtin_plugin_t *p, const char *name)
         if (!strcmp(name, "manifest.json")) return CLOCK_MANIFEST;
         if (!strcmp(name, "main.lua")) return CLOCK_LUA;
     }
+    if (!strcmp(p->id, "bili")) {
+        if (!strcmp(name, "manifest.json")) return BILI_MANIFEST;
+        if (!strcmp(name, "main.lua")) return BILI_LUA;
+    }
     if (!strcmp(p->id, "dfm")) {
         if (!strcmp(name, "manifest.json")) return DFM_MANIFEST;
         if (!strcmp(name, "main.lua")) return DFM_LUA;
@@ -442,6 +585,7 @@ static const char *file_content(const builtin_plugin_t *p, const char *name)
 
 static const builtin_plugin_t BUILTINS[] = {
     {"clock", "时钟（cute / tech / minimal）", "1.1.0", CLOCK_FILES},
+    {"bili", "哔哩哔哩", "1.0.0", BILI_FILES},
     {"dfm", "三角洲", "2.0.0", DFM_FILES},
     {"weather", "天气（实时 + 未来三天）", "2.5.1", WEATHER_FILES},
     {NULL, NULL, NULL, NULL},

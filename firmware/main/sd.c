@@ -24,6 +24,8 @@ static bool s_ok;
 esp_err_t sd_mount(void)
 {
     io_exio_set(EXIO_SD_D3, 1);
+    ESP_LOGI(TAG, "EXIO shadow=0x%02x (D3=%d)", io_exio_state(),
+             (io_exio_state() >> (EXIO_SD_D3 - 1)) & 1);
 
     esp_vfs_fat_sdmmc_mount_config_t mcfg = {
         .format_if_mount_failed = false,
@@ -33,7 +35,6 @@ esp_err_t sd_mount(void)
 
     sdmmc_host_t host = SDMMC_HOST_DEFAULT();
     host.slot = SDMMC_HOST_SLOT_1;
-    host.max_freq_khz = SDMMC_FREQ_HIGHSPEED; /* 40MHz */
 
     sdmmc_slot_config_t slot = SDMMC_SLOT_CONFIG_DEFAULT();
     slot.clk = GPIO_NUM_2;
@@ -45,19 +46,24 @@ esp_err_t sd_mount(void)
     slot.width = 1;
     slot.flags |= SDMMC_SLOT_FLAG_INTERNAL_PULLUP;
 
+    /* 先高速试，不行就降频——线长/卡体差异会让 40MHz 起来不来 */
+    static const int freqs[] = {SDMMC_FREQ_HIGHSPEED, SDMMC_FREQ_DEFAULT, 10000};
     esp_err_t err = ESP_FAIL;
-    /* 卡没插好/刚上电接触不良时 mount 会失败，多试几次再放弃 */
-    for (int attempt = 0; attempt < 3; attempt++) {
-        err = esp_vfs_fat_sdmmc_mount("/sdcard", &host, &slot, &mcfg, &s_card);
-        if (err == ESP_OK) break;
-        ESP_LOGW(TAG, "mount attempt %d failed: %s", attempt + 1, esp_err_to_name(err));
-        vTaskDelay(pdMS_TO_TICKS(150));
+    for (size_t fi = 0; fi < sizeof(freqs) / sizeof(freqs[0]); fi++) {
+        host.max_freq_khz = freqs[fi];
+        for (int attempt = 0; attempt < 2; attempt++) {
+            err = esp_vfs_fat_sdmmc_mount("/sdcard", &host, &slot, &mcfg, &s_card);
+            if (err == ESP_OK) goto mounted;
+            ESP_LOGW(TAG, "mount failed @%dkHz (try %d): %s", freqs[fi], attempt + 1,
+                     esp_err_to_name(err));
+            vTaskDelay(pdMS_TO_TICKS(120));
+        }
     }
-    if (err != ESP_OK) {
-        ESP_LOGE(TAG, "mount failed: %s", esp_err_to_name(err));
-        s_ok = false;
-        return err;
-    }
+    ESP_LOGE(TAG, "mount failed: %s", esp_err_to_name(err));
+    s_ok = false;
+    return err;
+
+mounted:
 
     s_ok = true;
     ESP_LOGI(TAG, "mounted: %s %llu MB, %d-bit", s_card->cid.name,

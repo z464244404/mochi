@@ -25,6 +25,7 @@ and apps and assets are installed from the web console onto the TF card — no f
 | **Pet** | Three animation clips — eating rice / typing / sleeping — switched automatically by DeepSeek balance state; balance, today's spend and the peak/off-peak badge overlaid at the bottom |
 | **Clock** | Three styles: cute (cream + date pill), tech (tick marks + seconds arc), minimal (hands only + configurable colors) |
 | **Weather** | Live temperature + next three days, original meteocons animated icons + weather-dependent background, Chinese weather words |
+| **Bilibili** | Follower count (auto-scaled to 万/亿), following count; set your UID in the plugin details; refreshes every 5 min |
 | **Delta Force** | Nickname, battlefield rank score, liquid/illiquid assets, recent gain (red up / green down with arrows) — data pushed by tools/df_sync.py on your computer |
 
 **Plugin system**: apps are "plugins" — built-in ones (network/pet) and card ones (clock/weather/your own) go through the same path:
