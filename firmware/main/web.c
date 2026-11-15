@@ -365,6 +365,101 @@ static esp_err_t fontpack_put(httpd_req_t *r)
     return send_json(r, j);
 }
 
+/* url_decode 定义在下面（dfm 那一节），这里先声明，music 要用 */
+static void url_decode(char *s);
+
+/* POST /api/music?title=&artist=&pos=&dur=&playing=&ts=
+ * 电脑上的 tools/music_sync.py 把系统媒体信息推过来（音乐副屏用） */
+static esp_err_t music_post(httpd_req_t *r)
+{
+    char title[128] = "", artist[96] = "", pos[16] = "0", dur[16] = "0";
+    char playing[8] = "0", ts[24] = "0";
+
+    query(r, "title", title, sizeof(title));
+    query(r, "artist", artist, sizeof(artist));
+    query(r, "pos", pos, sizeof(pos));
+    query(r, "dur", dur, sizeof(dur));
+    query(r, "playing", playing, sizeof(playing));
+    query(r, "ts", ts, sizeof(ts));
+    url_decode(title);
+    url_decode(artist);
+
+    cJSON *o = cJSON_CreateObject();
+    if (!o) return ESP_OK;
+    cJSON_AddStringToObject(o, "title", title);
+    cJSON_AddStringToObject(o, "artist", artist);
+    cJSON_AddStringToObject(o, "pos", pos);
+    cJSON_AddStringToObject(o, "dur", dur);
+    cJSON_AddStringToObject(o, "playing", playing);
+    cJSON_AddStringToObject(o, "ts", ts);
+
+    char *js = cJSON_PrintUnformatted(o);
+    bool ok = false;
+    if (js) {
+        FILE *f = sd_open_write("/sdcard/plugins/music/data.json", 3);
+        if (f) {
+            ok = fwrite(js, 1, strlen(js), f) == strlen(js);
+            fclose(f);
+        }
+        cJSON_free(js);
+    }
+    cJSON_Delete(o);
+
+    cJSON *res = cJSON_CreateObject();
+    if (res) {
+        cJSON_AddBoolToObject(res, "ok", ok);
+        return send_json(r, res);
+    }
+    return ESP_OK;
+}
+
+/* POST /api/music/cover —— 裸 RGB565（240x240x2 = 115200 字节） */
+static esp_err_t music_cover_post(httpd_req_t *r)
+{
+    if (r->content_len != 240 * 240 * 2) {
+        httpd_resp_send_err(r, HTTPD_400_BAD_REQUEST, "expect 240x240 rgb565");
+        return ESP_FAIL;
+    }
+    char *buf = heap_caps_malloc(8192, MALLOC_CAP_SPIRAM);
+    if (!buf) {
+        httpd_resp_send_err(r, HTTPD_500_INTERNAL_SERVER_ERROR, "no mem");
+        return ESP_FAIL;
+    }
+    mkdir("/sdcard/plugins", 0777);
+    mkdir("/sdcard/plugins/music", 0777);
+    FILE *f = NULL;
+    for (int attempt = 0; attempt < 3 && !f; attempt++)
+        f = sd_open_write("/sdcard/plugins/music/cover.565", 5);
+    if (!f) {
+        heap_caps_free(buf);
+        httpd_resp_send_err(r, HTTPD_500_INTERNAL_SERVER_ERROR, "open failed");
+        return ESP_FAIL;
+    }
+
+    int remaining = r->content_len;
+    int total = 0;
+    bool io_ok = true;
+    while (remaining > 0) {
+        int want = remaining < 8192 ? remaining : 8192;
+        int n = httpd_req_recv(r, buf, want);
+        if (n <= 0) { io_ok = false; break; }
+        if (fwrite(buf, 1, n, f) != (size_t)n) { io_ok = false; break; }
+        total += n;
+        remaining -= n;
+    }
+    fclose(f);
+    heap_caps_free(buf);
+
+    ESP_LOGI(TAG, "music cover: %d bytes ok=%d", total, (int)io_ok);
+    cJSON *res = cJSON_CreateObject();
+    if (res) {
+        cJSON_AddBoolToObject(res, "ok", io_ok);
+        cJSON_AddNumberToObject(res, "bytes", total);
+        return send_json(r, res);
+    }
+    return ESP_OK;
+}
+
 /* POST /api/dfm?nick=&rank=&liquid=&noncur=&gain=&ts=
  * 电脑上的 tools/df_sync.py 拉完腾讯接口后推过来，插件只负责显示 */
 static void url_decode(char *s)
@@ -738,6 +833,8 @@ esp_err_t web_start(void)
         {.uri = "/api/ota", .method = HTTP_POST, .handler = ota_post},
     {.uri = "/api/dfm", .method = HTTP_POST, .handler = dfm_post},
     {.uri = "/api/fontpack", .method = HTTP_POST, .handler = fontpack_put},
+    {.uri = "/api/music", .method = HTTP_POST, .handler = music_post},
+    {.uri = "/api/music/cover", .method = HTTP_POST, .handler = music_cover_post},
     };
     for (size_t i = 0; i < sizeof(uris) / sizeof(uris[0]); i++) {
         httpd_register_uri_handler(s_srv, &uris[i]);

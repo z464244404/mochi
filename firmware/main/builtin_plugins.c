@@ -518,7 +518,119 @@ static const char *BILI_LUA =
     "end\n"
     ;
 
+static const char *MUSIC_MANIFEST =
+    "{\n"
+    "  \"id\": \"music\",\n"
+    "  \"name\": \"音乐\",\n"
+    "  \"version\": \"1.0.0\",\n"
+    "  \"api\": 1,\n"
+    "  \"author\": \"mochi\",\n"
+    "  \"settings\": [\n"
+    "    {\"key\": \"hint\", \"label\": \"数据来源\", \"type\": \"text\",\n"
+    "     \"default\": \"电脑上运行 python tools/music_sync.py\"}\n"
+    "  ]\n"
+    "}\n"
+    ;
+
+static const char *MUSIC_LUA =
+    "-- 音乐副屏：电脑上的 music_sync.py 把系统正在播放的歌推过来\n"
+    "-- 封面是 240x240 的 RGB565 裸数据（/sdcard/plugins/music/cover.565），设备不解码\n"
+    "local t = 0\n"
+    "local last_reload = -1\n"
+    "local title, artist, pos, dur, playing, ts\n"
+    "\n"
+    "local function text_or(v, def)\n"
+    "  if v == nil or v == \"\" then return def end\n"
+    "  return v\n"
+    "end\n"
+    "\n"
+    "local function load()\n"
+    "  title = store.get(\"title\") or \"\"\n"
+    "  artist = store.get(\"artist\") or \"\"\n"
+    "  pos = tonumber(store.get(\"pos\") or \"0\") or 0\n"
+    "  dur = tonumber(store.get(\"dur\") or \"0\") or 0\n"
+    "  playing = (store.get(\"playing\") or \"0\") == \"1\"\n"
+    "  ts = tonumber(store.get(\"ts\") or \"0\") or 0\n"
+    "end\n"
+    "\n"
+    "-- 按宽度裁剪标题，超长加省略号（字体里没有 …，用 . 代替）\n"
+    "local function clip(s, size, maxw)\n"
+    "  if ui.measure(s, size) <= maxw then return s end\n"
+    "  local out = s\n"
+    "  while #out > 1 and ui.measure(out .. \"..\", size) > maxw do\n"
+    "    out = out:sub(1, #out - 1)\n"
+    "  end\n"
+    "  return out .. \"..\"\n"
+    "end\n"
+    "\n"
+    "local function mmss(sec)\n"
+    "  if sec < 0 then sec = 0 end\n"
+    "  return string.format(\"%d:%02d\", math.floor(sec / 60), math.floor(sec % 60))\n"
+    "end\n"
+    "\n"
+    "function on_start()\n"
+    "  load()\n"
+    "end\n"
+    "\n"
+    "local function draw_idle()\n"
+    "  ui.circle(240, 176, 86, 0x1A1F27)\n"
+    "  ui.ring(240, 176, 60, 3, 0x2C3542)\n"
+    "  ui.text(\"等待播放\", 240, 350, 29, 0x6b7785)\n"
+    "  ui.text(\"电脑上运行 music_sync.py\", 240, 392, 22, 0x4E5A68)\n"
+    "end\n"
+    "\n"
+    "function on_draw(dt)\n"
+    "  t = t + dt\n"
+    "  if t - last_reload > 2 then\n"
+    "    last_reload = t\n"
+    "    store.reload()\n"
+    "    load()\n"
+    "  end\n"
+    "\n"
+    "  ui.clear(0x0B0D12)\n"
+    "\n"
+    "  if title == \"\" then\n"
+    "    draw_idle()\n"
+    "    return\n"
+    "  end\n"
+    "\n"
+    "  -- 封面（电脑推了才有）\n"
+    "  if not ui.cover(240, 176, 240) then\n"
+    "    ui.circle(240, 176, 120, 0x1A1F27)\n"
+    "    ui.text(\"?\", 240, 176, 106, 0x2C3542)\n"
+    "  end\n"
+    "\n"
+    "  ui.text(clip(title, 29, 400), 240, 336, 29, 0xF2F6FA)\n"
+    "  if artist ~= \"\" then\n"
+    "    ui.text(clip(artist, 22, 400), 240, 372, 22, 0x7E8C9C)\n"
+    "  end\n"
+    "\n"
+    "  -- 进度：本地按时间插值，避免每帧都等推送\n"
+    "  local elapsed = pos\n"
+    "  if playing and ts > 0 then\n"
+    "    local now = time.epoch()\n"
+    "    if now > 1000000000 and now > ts then elapsed = pos + (now - ts) end\n"
+    "  end\n"
+    "  if dur > 0 and elapsed > dur then elapsed = dur end\n"
+    "\n"
+    "  local x0, x1, y = 110, 370, 404\n"
+    "  ui.round_rect(x0, y - 2, x1 - x0, 5, 2, 0x232A34)\n"
+    "  if dur > 0 then\n"
+    "    local w = math.floor((x1 - x0) * elapsed / dur)\n"
+    "    if w > 0 then ui.round_rect(x0, y - 2, w, 5, 2, playing and 0x35D07F or 0x7E8C9C) end\n"
+    "  end\n"
+    "\n"
+    "  ui.text(mmss(elapsed), x0 - 26, 432, 22, 0x6b7785)\n"
+    "  ui.text(dur > 0 and mmss(dur) or \"--:--\", x1 + 26, 432, 22, 0x6b7785)\n"
+    "end\n"
+    ;
+
 static const builtin_file_t CLOCK_FILES[] = {
+    {"manifest.json", NULL},
+    {"main.lua", NULL},
+};
+
+static const builtin_file_t MUSIC_FILES[] = {
     {"manifest.json", NULL},
     {"main.lua", NULL},
 };
@@ -545,6 +657,10 @@ static const char *file_content(const builtin_plugin_t *p, const char *name)
         if (!strcmp(name, "manifest.json")) return CLOCK_MANIFEST;
         if (!strcmp(name, "main.lua")) return CLOCK_LUA;
     }
+    if (!strcmp(p->id, "music")) {
+        if (!strcmp(name, "manifest.json")) return MUSIC_MANIFEST;
+        if (!strcmp(name, "main.lua")) return MUSIC_LUA;
+    }
     if (!strcmp(p->id, "bili")) {
         if (!strcmp(name, "manifest.json")) return BILI_MANIFEST;
         if (!strcmp(name, "main.lua")) return BILI_LUA;
@@ -562,6 +678,7 @@ static const char *file_content(const builtin_plugin_t *p, const char *name)
 
 static const builtin_plugin_t BUILTINS[] = {
     {"clock", "时钟（cute / tech / minimal）", "1.1.0", CLOCK_FILES},
+    {"music", "音乐", "1.0.0", MUSIC_FILES},
     {"bili", "哔哩哔哩", "1.3.0", BILI_FILES},
     {"dfm", "三角洲", "2.0.0", DFM_FILES},
     {"weather", "天气（实时 + 未来三天）", "2.5.1", WEATHER_FILES},

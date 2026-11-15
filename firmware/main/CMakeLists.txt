@@ -17,6 +17,7 @@ idf_component_register(
         "builtin_plugins.c"
         "icons.c"
         "fontpack.c"
+        "cover.c"
         "bg.c"
         "imu.c"
         "rtc.c"

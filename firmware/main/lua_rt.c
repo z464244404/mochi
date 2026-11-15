@@ -15,6 +15,7 @@
 #include "freertos/task.h"
 #include "icons.h"
 #include "bg.h"
+#include "cover.h"
 #include "lauxlib.h"
 #include "lua.h"
 #include "lualib.h"
@@ -383,11 +384,26 @@ static int l_bg(lua_State *L_)
     return 1;
 }
 
+/* ui.cover(cx, cy, size) —— 电脑推送的专辑封面（圆形裁剪） */
+static int l_cover(lua_State *L_)
+{
+    int cx = (int)luaL_checkinteger(L_, 1);
+    int cy = (int)luaL_checkinteger(L_, 2);
+    int size = (int)luaL_optinteger(L_, 3, 240);
+    bool ok = false;
+    if (s_cur && size > 0) {
+        cover_load("/sdcard/plugins/music/cover.565", 240);
+        ok = cover_draw(s_cur, cx, cy, size);
+    }
+    lua_pushboolean(L_, ok);
+    return 1;
+}
+
 static const luaL_Reg ui_funcs[] = {
     {"clear", l_clear},   {"rect", l_rect},     {"round_rect", l_round_rect},
     {"circle", l_circle}, {"ring", l_ring},     {"arc", l_arc},
     {"line", l_line},     {"text", l_text},     {"measure", l_measure},
-    {"icon", l_icon},     {"bg", l_bg},
+    {"icon", l_icon},     {"bg", l_bg},      {"cover", l_cover},
     {NULL, NULL},
 };
 
