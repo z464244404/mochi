@@ -145,7 +145,7 @@ static const char *WEATHER_MANIFEST =
     "{\n"
     "  \"id\": \"weather\",\n"
     "  \"name\": \"天气\",\n"
-    "  \"version\": \"2.5.0\",\n"
+    "  \"version\": \"2.5.1\",\n"
     "  \"api\": 1,\n"
     "  \"author\": \"mochi\",\n"
     "  \"settings\": [\n"
@@ -246,7 +246,7 @@ static const char *WEATHER_LUA =
     "    store.set(\"wx\", body)\n"
     "    store.set(\"wx_ts\", tostring(time.epoch()))\n"
     "    err = nil\n"
-    "    next_fetch = t + 600\n"
+    "    next_fetch = t + 300\n"
     "    log(\"weather \" .. cur.temp .. \" city=\" .. city)\n"
     "  end)\n"
     "end\n"
@@ -260,7 +260,10 @@ static const char *WEATHER_LUA =
     "  local raw = store.get(\"wx\")\n"
     "  if raw then apply(json.decode(raw)) end\n"
     "  local ts = tonumber(store.get(\"wx_ts\") or \"0\") or 0\n"
-    "  if time.epoch() - ts > 600 then next_fetch = 0 else next_fetch = t + 600 end\n"
+    "  -- 只等「剩余」的时间：每次进屏 t 都从 0 开始，不能直接 t+600，\n"
+    "  -- 否则来回换屏等于永远不刷新\n"
+    "  local left = 300 - (time.epoch() - ts)\n"
+    "  if left <= 0 then next_fetch = 0 else next_fetch = t + left end\n"
     "end\n"
     "\n"
     "-- 未来三天：横排三列，日期 / 图标 / 高温(橙) / 低温(蓝)\n"
@@ -440,7 +443,7 @@ static const char *file_content(const builtin_plugin_t *p, const char *name)
 static const builtin_plugin_t BUILTINS[] = {
     {"clock", "时钟（cute / tech / minimal）", "1.1.0", CLOCK_FILES},
     {"dfm", "三角洲", "2.0.0", DFM_FILES},
-    {"weather", "天气（实时 + 未来三天）", "2.5.0", WEATHER_FILES},
+    {"weather", "天气（实时 + 未来三天）", "2.5.1", WEATHER_FILES},
     {NULL, NULL, NULL, NULL},
 };
 

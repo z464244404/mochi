@@ -413,7 +413,7 @@ static void http_worker(void *arg)
         if (body) {
             esp_http_client_config_t cfg = {
                 .url = req.url,
-                .timeout_ms = 15000,
+                .timeout_ms = 25000, /* 开机头几秒 DNS/TCP 慢，别设太短 */
                 .crt_bundle_attach = esp_crt_bundle_attach,
             };
             esp_http_client_handle_t c = esp_http_client_init(&cfg);
