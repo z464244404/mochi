@@ -64,6 +64,20 @@ idf.py -p COM10 flash monitor
 第一次开机设备会把素材从 flash 分区同步到 TF 卡，然后自动擦掉那个分区——
 素材只留在卡上，闪存不背这个包袱。
 
+## 插件仓库
+
+每个内置插件都有独立仓库，可以单独下载/安装，也方便别人参考或改：
+
+| 插件 | 仓库 | 说明 |
+|---|---|---|
+| 时钟 | [mochi-plugin-clock](https://github.com/z464244404/mochi-plugin-clock) | cute / tech / minimal 三种样式 |
+| 天气 | [mochi-plugin-weather](https://github.com/z464244404/mochi-plugin-weather) | Open-Meteo 实时 + 三天，动画图标 + 天气背景 |
+| 三角洲 | [mochi-plugin-dfm](https://github.com/z464244404/mochi-plugin-dfm) | 段位分 / 资产 / 最近收益，电脑端脚本推送 |
+| 哔哩哔哩 | [mochi-plugin-bili](https://github.com/z464244404/mochi-plugin-bili) | 粉丝数，官方公开接口，免登录 |
+
+仓库里的 `manifest.json` + `main.lua` 就是插件本体，网页后台「安装 / 更新插件」选这两个文件即可。
+本仓库的 `plugins/` 目录是这些插件的副本，固件里的内置副本由 `tools/extract_plugins.py` 生成。
+
 ## 文档
 
 | 文档 | 内容 |
