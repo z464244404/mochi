@@ -78,6 +78,7 @@ typedef struct {
     uint16_t count;
     uint16_t line_h;
     const uint8_t *bitmap;
+    uint16_t px; /* 字号，卡上字体包按它挑最接近的一套 */
 } mochi_font_t;
 
 enum { GFX_ALIGN_LEFT = 0, GFX_ALIGN_CENTER = 1, GFX_ALIGN_RIGHT = 2 };

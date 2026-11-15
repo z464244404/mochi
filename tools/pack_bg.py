@@ -41,6 +41,16 @@ def main():
         blobs.append(("bili", im.size[0], im.size[1], b.getvalue()))
         print("  + bili (fan-bg.png, %dx%d)" % im.size)
 
+
+    # 音乐插件背景：music-bg/png/vinyl.png -> "music"（黑胶纹路，封面正好在中间）
+    vinyl = os.path.join(ROOT, "music-bg", "png", "vinyl.png")
+    if os.path.exists(vinyl):
+        im = Image.open(vinyl).convert("RGB")
+        b = io.BytesIO()
+        im.save(b, "JPEG", quality=QUALITY, subsampling=2, optimize=True)
+        blobs.append(("music", im.size[0], im.size[1], b.getvalue()))
+        print("  + music (vinyl.png, %dx%d)" % im.size)
+
     header = 8 + len(blobs) * (28 + 16)
     off = header
     entries = []

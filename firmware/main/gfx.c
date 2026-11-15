@@ -408,7 +408,7 @@ float gfx_text_width(const mochi_font_t *f, const char *utf8)
             w += gl->adv;
         } else {
             uint16_t adv = 0;
-            if (fp_adv(cp, &adv)) {
+            if (fp_adv(cp, f->px, &adv)) {
                 w += adv; /* 卡上的字体包 */
             } else {
                 w += f->line_h * 0.5f;
@@ -436,7 +436,7 @@ void gfx_text(gfx_t *g, const mochi_font_t *f, const char *utf8, float x, float 
         mochi_glyph_t tmp;
         if (gl) {
             src = f->bitmap + gl->off;
-        } else if (fp_glyph(cp, &tmp, &src)) {
+        } else if (fp_glyph(cp, f->px, &tmp, &src)) {
             gl = &tmp; /* 卡上的字体包 */
             if (!src) {
                 pen += gl->adv;

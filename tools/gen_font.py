@@ -72,7 +72,7 @@ def build(font_path, size, chars):
     return glyphs, blob, max(h for _, _, h, _, _, _, _ in glyphs), line_h
 
 
-def emit(f, name, glyphs, blob, max_h, line_h):
+def emit(f, name, glyphs, blob, max_h, line_h, px):
     f.write(f"/* {name}: {len(glyphs)} glyphs, {len(blob)} bytes, max_h={max_h} */\n")
     f.write(f"static const uint8_t bm_{name}[] = {{\n")
     for i in range(0, len(blob), 24):
@@ -85,7 +85,7 @@ def emit(f, name, glyphs, blob, max_h, line_h):
     f.write("};\n\n")
 
     f.write(f"const mochi_font_t {name} = {{\n")
-    f.write(f"    gl_{name}, {len(glyphs)}, {line_h}, bm_{name},\n")
+    f.write(f"    gl_{name}, {len(glyphs)}, {line_h}, bm_{name}, {px},\n")
     f.write("};\n\n")
 
 
@@ -96,7 +96,7 @@ def main():
         for name, path, size, chars in FONTS:
             glyphs, blob, max_h, line_h = build(path, size, chars)
             total += len(blob)
-            emit(f, name, glyphs, blob, max_h, line_h)
+            emit(f, name, glyphs, blob, max_h, line_h, size)
             print(f"{name}: {len(glyphs)} glyphs, {len(blob)/1024:.1f} KB bitmap")
         print(f"total: {total/1024:.1f} KB -> {OUT}")
 

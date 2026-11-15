@@ -316,8 +316,11 @@ static esp_err_t fontpack_put(httpd_req_t *r)
     }
 
     mkdir("/sdcard/fonts", 0777);
-    const char *tmp = "/sdcard/fonts/fontpack.tmp";
-    const char *dst = "/sdcard/fonts/fontpack.bin";
+    char which[8] = "";
+    query(r, "size", which, sizeof(which));
+    bool is22 = (which[0] == '2');
+    const char *tmp = is22 ? "/sdcard/fonts/fontpack22.tmp" : "/sdcard/fonts/fontpack.tmp";
+    const char *dst = is22 ? "/sdcard/fonts/fontpack22.bin" : "/sdcard/fonts/fontpack.bin";
 
     FILE *f = NULL;
     for (int attempt = 0; attempt < 3 && !f; attempt++) f = sd_open_write(tmp, 5);
@@ -363,11 +366,71 @@ static esp_err_t fontpack_put(httpd_req_t *r)
     cJSON_AddBoolToObject(j, "ok", ok);
     cJSON_AddNumberToObject(j, "bytes", total);
     cJSON_AddNumberToObject(j, "glyphs", fp_count());
+    cJSON_AddNumberToObject(j, "glyphs29", fp_count_px(29));
+    cJSON_AddNumberToObject(j, "glyphs22", fp_count_px(22));
     return send_json(r, j);
 }
 
 /* url_decode 定义在下面（dfm 那一节），这里先声明，music 要用 */
 static void url_decode(char *s);
+
+/* GET /api/shot.bmp —— 把当前帧导成 BMP（浏览器打开就能存图） */
+extern const uint16_t *mochi_last_frame(void);
+extern void mochi_pause_render(bool on);
+
+static esp_err_t shot_bmp_get(httpd_req_t *r)
+{
+    mochi_pause_render(true);
+    vTaskDelay(pdMS_TO_TICKS(80)); /* 等当前这帧画完 */
+    const uint16_t *fb = mochi_last_frame();
+    if (!fb) {
+        httpd_resp_send_err(r, HTTPD_500_INTERNAL_SERVER_ERROR, "no frame");
+        return ESP_FAIL;
+    }
+
+    const int w = 480, h = 480;
+    const int row = (w * 3 + 3) & ~3; /* BMP 每行 4 字节对齐 */
+    const uint32_t data = (uint32_t)row * h;
+    uint8_t hdr[54] = {0};
+    hdr[0] = 'B';
+    hdr[1] = 'M';
+    uint32_t total = 54 + data;
+    memcpy(&hdr[2], &total, 4);
+    uint32_t off = 54;
+    memcpy(&hdr[10], &off, 4);
+    uint32_t hsz = 40;
+    memcpy(&hdr[14], &hsz, 4);
+    memcpy(&hdr[18], &w, 4);
+    memcpy(&hdr[22], &h, 4);
+    uint16_t planes = 1, bpp = 24;
+    memcpy(&hdr[26], &planes, 2);
+    memcpy(&hdr[28], &bpp, 2);
+    memcpy(&hdr[34], &data, 4);
+
+    httpd_resp_set_type(r, "image/bmp");
+    httpd_resp_set_hdr(r, "Cache-Control", "no-store");
+    httpd_resp_send_chunk(r, (const char *)hdr, 54);
+
+    uint8_t *line = heap_caps_malloc(row, MALLOC_CAP_SPIRAM);
+    if (!line) {
+        httpd_resp_send_err(r, HTTPD_500_INTERNAL_SERVER_ERROR, "no mem");
+        return ESP_FAIL;
+    }
+    for (int y = h - 1; y >= 0; y--) {
+        const uint16_t *src = fb + (size_t)y * w;
+        for (int x = 0; x < w; x++) {
+            uint16_t c = src[x];
+            line[x * 3 + 0] = (uint8_t)((c & 0x1F) << 3);          /* B */
+            line[x * 3 + 1] = (uint8_t)(((c >> 5) & 0x3F) << 2);   /* G */
+            line[x * 3 + 2] = (uint8_t)(((c >> 11) & 0x1F) << 3);  /* R */
+        }
+        httpd_resp_send_chunk(r, (const char *)line, row);
+    }
+    heap_caps_free(line);
+    httpd_resp_send_chunk(r, NULL, 0);
+    mochi_pause_render(false);
+    return ESP_OK;
+}
 
 /* POST /api/music?title=&artist=&pos=&dur=&playing=&ts=
  * 电脑上的 tools/music_sync.py 把系统媒体信息推过来（音乐副屏用） */
@@ -870,6 +933,7 @@ esp_err_t web_start(void)
         {.uri = "/api/ota", .method = HTTP_POST, .handler = ota_post},
     {.uri = "/api/dfm", .method = HTTP_POST, .handler = dfm_post},
     {.uri = "/api/fontpack", .method = HTTP_POST, .handler = fontpack_put},
+    {.uri = "/api/shot.bmp", .method = HTTP_GET, .handler = shot_bmp_get},
     {.uri = "/api/music", .method = HTTP_POST, .handler = music_post},
     {.uri = "/api/music/cover", .method = HTTP_POST, .handler = music_cover_post},
     };

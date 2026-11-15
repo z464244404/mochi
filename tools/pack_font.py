@@ -16,7 +16,8 @@ import struct
 from PIL import Image, ImageDraw, ImageFont
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-OUT = os.path.join(ROOT, "release", "fontpack.bin")
+OUT_29 = os.path.join(ROOT, "release", "fontpack.bin")
+OUT_22 = os.path.join(ROOT, "release", "fontpack22.bin")
 REG = r"C:\Windows\Fonts\HarmonyOS_Sans_SC_Regular.ttf"
 
 EXTRA = "℃℉°±×÷←→↑↓、。，！？：；「」『』（）【】…—·～《》“”‘’"
@@ -74,8 +75,9 @@ def build(size):
     index_off = header_len
     data_off = index_off + len(entries) * 20
 
-    os.makedirs(os.path.dirname(OUT), exist_ok=True)
-    with open(OUT, "wb") as f:
+    out = OUT_22 if size == 22 else OUT_29
+    os.makedirs(os.path.dirname(out), exist_ok=True)
+    with open(out, "wb") as f:
         f.write(b"FTP1")
         f.write(struct.pack("<HH", size, 0))
         f.write(struct.pack("<III", len(entries), index_off, data_off))
@@ -83,8 +85,8 @@ def build(size):
             f.write(struct.pack("<IIhhhhH", cp, off, w, h, bx, by, adv) + b"\x00\x00")
         f.write(blob)
 
-    kb = os.path.getsize(OUT) / 1024.0
-    print("%s: %d glyphs @ %dpx, %.0f KB" % (OUT, len(entries), size, kb))
+    kb = os.path.getsize(out) / 1024.0
+    print("%s: %d glyphs @ %dpx, %.0f KB" % (out, len(entries), size, kb))
 
 
 if __name__ == "__main__":

@@ -2215,7 +2215,7 @@ static const mochi_glyph_t gl_font_digits_106[] = {
 };
 
 const mochi_font_t font_digits_106 = {
-    gl_font_digits_106, 12, 127, bm_font_digits_106,
+    gl_font_digits_106, 12, 127, bm_font_digits_106, 106,
 };
 
 /* font_num_56: 12 glyphs, 14910 bytes, max_h=43 */
@@ -2860,7 +2860,7 @@ static const mochi_glyph_t gl_font_num_56[] = {
 };
 
 const mochi_font_t font_num_56 = {
-    gl_font_num_56, 12, 67, bm_font_num_56,
+    gl_font_num_56, 12, 67, bm_font_num_56, 56,
 };
 
 /* font_ui_29: 233 glyphs, 137792 bytes, max_h=31 */
@@ -8846,7 +8846,7 @@ static const mochi_glyph_t gl_font_ui_29[] = {
 };
 
 const mochi_font_t font_ui_29 = {
-    gl_font_ui_29, 233, 35, bm_font_ui_29,
+    gl_font_ui_29, 233, 35, bm_font_ui_29, 29,
 };
 
 /* font_num_22: 16 glyphs, 3287 bytes, max_h=20 */
@@ -9010,6 +9010,6 @@ static const mochi_glyph_t gl_font_num_22[] = {
 };
 
 const mochi_font_t font_num_22 = {
-    gl_font_num_22, 16, 26, bm_font_num_22,
+    gl_font_num_22, 16, 26, bm_font_num_22, 22,
 };
 

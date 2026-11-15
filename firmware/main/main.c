@@ -240,6 +240,20 @@ static void sd_services_init(void)
     fp_init();
 }
 
+/* 给 /api/shot.bmp 用：拿最近一帧的 RGB565 缓冲 */
+/* 截图时暂停渲染，避免抓到撕裂的帧 */
+static volatile bool s_pause_render;
+
+void mochi_pause_render(bool on)
+{
+    s_pause_render = on;
+}
+
+const uint16_t *mochi_last_frame(void)
+{
+    return s_last_fb;
+}
+
 void app_main(void)
 {
     ESP_LOGI(TAG, "========== Mochi 0.1 ==========");
@@ -299,6 +313,12 @@ void app_main(void)
         float dt = (float)(now - last) / 1000000.0f;
         last = now;
         if (dt > 0.1f) dt = 0.1f;
+
+        if (s_pause_render) {
+            vTaskDelay(pdMS_TO_TICKS(10));
+            last = esp_timer_get_time();
+            continue;
+        }
 
         /* 卡没插好也能救：每 5 秒试着挂一次，插上就自动恢复，不用重启 */
         if (!sd_ready() && now - last_sd_probe > 5000000) {

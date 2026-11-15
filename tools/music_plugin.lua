@@ -1,13 +1,20 @@
 -- 音乐副屏：电脑上的 music_sync.py 把系统正在播放的歌推过来
--- 封面是 240x240 的 RGB565 裸数据（/sdcard/plugins/music/cover.565），设备不解码
+-- 版式严格按 music-bg/README.md：
+--   封面 圆心(240,150) 直径240 / 曲名 基线310 29px / 歌手 基线344 22px
+--   进度条 x100→380 y378 / 时间 基线404 22px，左贴100、右贴380
+-- 注意 ui.text 的 y 是「竖直中心」：29px 基线 = y+11，22px 基线 = y+8.5
 local t = 0
 local last_reload = -1
 local title, artist, pos, dur, playing, ts
 
-local function text_or(v, def)
-  if v == nil or v == "" then return def end
-  return v
-end
+local GREEN = 0x5BE0BD
+local GREY = 0x5A6270
+local TRACK = 0x3E444E
+
+local TITLE_Y = 299   -- 基线 310
+local ARTIST_Y = 336  -- 基线 344
+local TIME_Y = 396    -- 基线 404
+local BAR_X0, BAR_X1, BAR_Y = 100, 380, 378
 
 local function load()
   title = store.get("title") or ""
@@ -18,7 +25,7 @@ local function load()
   ts = tonumber(store.get("ts") or "0") or 0
 end
 
--- 按宽度裁剪标题，超长加省略号（字体里没有 …，用 . 代替）
+-- 按宽度裁剪，超长补 ..
 local function clip(s, size, maxw)
   if ui.measure(s, size) <= maxw then return s end
   local out = s
@@ -30,6 +37,10 @@ end
 
 local function mmss(sec)
   if sec < 0 then sec = 0 end
+  local h = math.floor(sec / 3600)
+  if h > 0 then
+    return string.format("%d:%02d:%02d", h, math.floor(sec % 3600 / 60), math.floor(sec % 60))
+  end
   return string.format("%d:%02d", math.floor(sec / 60), math.floor(sec % 60))
 end
 
@@ -37,11 +48,11 @@ function on_start()
   load()
 end
 
+-- 120px 半径的留白提示（没在放歌时）
 local function draw_idle()
-  ui.circle(240, 176, 86, 0x1A1F27)
-  ui.ring(240, 176, 60, 3, 0x2C3542)
-  ui.text("等待播放", 240, 350, 29, 0x6b7785)
-  ui.text("电脑上运行 music_sync.py", 240, 392, 22, 0x4E5A68)
+  ui.ring(240, 150, 118, 2, 0x2C3542)
+  ui.text("等待播放", 240, 336, 29, 0x6B7785)
+  ui.text("电脑上运行 music_sync.py", 240, 372, 22, 0x4E5A68)
 end
 
 function on_draw(dt)
@@ -52,25 +63,24 @@ function on_draw(dt)
     load()
   end
 
-  ui.clear(0x0B0D12)
+  if not ui.bg("music") then ui.clear(0x0B0D12) end
 
   if title == "" then
     draw_idle()
     return
   end
 
-  -- 封面（电脑推了才有）
-  if not ui.cover(240, 176, 240) then
-    ui.circle(240, 176, 120, 0x1A1F27)
-    ui.text("?", 240, 176, 106, 0x2C3542)
+  -- 封面：电脑推了才有（240x240 RGB565）
+  if not ui.cover(240, 150, 240) then
+    ui.circle(240, 150, 120, 0x1A1F27)
   end
 
-  ui.text(clip(title, 29, 400), 240, 336, 29, 0xF2F6FA)
+  ui.text(clip(title, 29, 360), 240, TITLE_Y, 29, 0xF2F6FA)
   if artist ~= "" then
-    ui.text(clip(artist, 22, 400), 240, 372, 22, 0x7E8C9C)
+    ui.text(clip(artist, 22, 360), 240, ARTIST_Y, 22, 0x9AA8B8)
   end
 
-  -- 进度：本地按时间插值，避免每帧都等推送
+  -- 进度：本地插值，别等推送
   local elapsed = pos
   if playing and ts > 0 then
     local now = time.epoch()
@@ -78,13 +88,19 @@ function on_draw(dt)
   end
   if dur > 0 and elapsed > dur then elapsed = dur end
 
-  local x0, x1, y = 110, 370, 404
-  ui.round_rect(x0, y - 2, x1 - x0, 5, 2, 0x232A34)
+  local col = playing and GREEN or GREY
+  ui.round_rect(BAR_X0, BAR_Y - 2, BAR_X1 - BAR_X0, 4, 2, TRACK)
   if dur > 0 then
-    local w = math.floor((x1 - x0) * elapsed / dur)
-    if w > 0 then ui.round_rect(x0, y - 2, w, 5, 2, playing and 0x35D07F or 0x7E8C9C) end
+    local w = math.floor((BAR_X1 - BAR_X0) * elapsed / dur)
+    if w > 1 then
+      ui.round_rect(BAR_X0, BAR_Y - 2, w, 4, 2, col)
+    end
+    ui.circle(BAR_X0 + w, BAR_Y, 7, col)
   end
 
-  ui.text(mmss(elapsed), x0 - 26, 432, 22, 0x6b7785)
-  ui.text(dur > 0 and mmss(dur) or "--:--", x1 + 26, 432, 22, 0x6b7785)
+  -- 时间：左贴 100、右贴 380（居中绘制，自己算中心）
+  local l = mmss(elapsed)
+  local r = dur > 0 and mmss(dur) or "--:--"
+  ui.text(l, BAR_X0 + ui.measure(l, 22) / 2, TIME_Y, 22, 0x7E8C9C)
+  ui.text(r, BAR_X1 - ui.measure(r, 22) / 2, TIME_Y, 22, 0x7E8C9C)
 end
