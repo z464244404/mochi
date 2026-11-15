@@ -390,10 +390,12 @@ static int l_cover(lua_State *L_)
     int cx = (int)luaL_checkinteger(L_, 1);
     int cy = (int)luaL_checkinteger(L_, 2);
     int size = (int)luaL_optinteger(L_, 3, 240);
+    float deg = (float)luaL_optnumber(L_, 4, 0);
     bool ok = false;
     if (s_cur && size > 0) {
         cover_load("/sdcard/plugins/music/cover.565", 240);
-        ok = cover_draw(s_cur, cx, cy, size);
+        ok = (deg == 0.0f) ? cover_draw(s_cur, cx, cy, size)
+                           : cover_draw_rot(s_cur, cx, cy, size, deg);
     }
     lua_pushboolean(L_, ok);
     return 1;

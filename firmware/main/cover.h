@@ -17,3 +17,6 @@ bool cover_load(const char *path, int side);
 
 /* 在 (cx, cy) 画一个直径 size 的圆形封面（最近邻缩放） */
 bool cover_draw(gfx_t *g, int cx, int cy, int size);
+
+/* 旋转绘制（deg 角度，顺时针） */
+bool cover_draw_rot(gfx_t *g, int cx, int cy, int size, float deg);

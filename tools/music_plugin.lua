@@ -6,6 +6,8 @@
 local t = 0
 local last_reload = -1
 local title, artist, pos, dur, playing, ts
+local angle = 0          -- 封面旋转角度（度）
+local SPEED = 25         -- 播放时每秒转多少度（360/25 ≈ 14.4 秒一圈）
 
 local GREEN = 0x5BE0BD
 local GREY = 0x5A6270
@@ -25,7 +27,6 @@ local function load()
   ts = tonumber(store.get("ts") or "0") or 0
 end
 
--- 按宽度裁剪，超长补 ..
 local function clip(s, size, maxw)
   if ui.measure(s, size) <= maxw then return s end
   local out = s
@@ -48,7 +49,6 @@ function on_start()
   load()
 end
 
--- 120px 半径的留白提示（没在放歌时）
 local function draw_idle()
   ui.ring(240, 150, 118, 2, 0x2C3542)
   ui.text("等待播放", 240, 336, 29, 0x6B7785)
@@ -70,17 +70,25 @@ function on_draw(dt)
     return
   end
 
-  -- 封面：电脑推了才有（240x240 RGB565）
-  if not ui.cover(240, 150, 240) then
+  -- 唱片旋转：播放时转，暂停就停住（角度保留）
+  if playing then
+    angle = angle + dt * SPEED
+    if angle >= 360 then angle = angle - 360 end
+  end
+
+  if not ui.cover(240, 150, 240, angle) then
     ui.circle(240, 150, 120, 0x1A1F27)
   end
+
+  -- 唱片中心的小孔
+  ui.circle(240, 150, 9, 0x14171C)
+  ui.ring(240, 150, 9, 1, 0x2C3542)
 
   ui.text(clip(title, 29, 360), 240, TITLE_Y, 29, 0xF2F6FA)
   if artist ~= "" then
     ui.text(clip(artist, 22, 360), 240, ARTIST_Y, 22, 0x9AA8B8)
   end
 
-  -- 进度：本地插值，别等推送
   local elapsed = pos
   if playing and ts > 0 then
     local now = time.epoch()
@@ -98,7 +106,6 @@ function on_draw(dt)
     ui.circle(BAR_X0 + w, BAR_Y, 7, col)
   end
 
-  -- 时间：左贴 100、右贴 380（居中绘制，自己算中心）
   local l = mmss(elapsed)
   local r = dur > 0 and mmss(dur) or "--:--"
   ui.text(l, BAR_X0 + ui.measure(l, 22) / 2, TIME_Y, 22, 0x7E8C9C)
