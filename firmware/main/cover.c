@@ -132,3 +132,8 @@ bool cover_draw_rot(gfx_t *g, int cx, int cy, int size, float deg)
     }
     return true;
 }
+
+size_t cover_mem_bytes(void)
+{
+    return s_px ? (size_t)s_side * s_side * 2 : 0;
+}

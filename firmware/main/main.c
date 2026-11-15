@@ -254,6 +254,24 @@ const uint16_t *mochi_last_frame(void)
     return s_last_fb;
 }
 
+
+/* 卡挂着但读不了（能 ls 不能 open）时，标记失效让主循环重挂。
+ * 之前只在"开不出来写"时标记，读失败不处理，所以插件会显示 PLUGIN MISSING。 */
+static void sd_health_check(void)
+{
+    static int fails;
+    struct stat st;
+    if (stat("/sdcard/plugins", &st) == 0) {
+        fails = 0;
+        return;
+    }
+    if (++fails >= 2) {
+        ESP_LOGW(TAG, "SD read fails (%d), remount", fails);
+        sd_mark_failed();
+        fails = 0;
+    }
+}
+
 void app_main(void)
 {
     ESP_LOGI(TAG, "========== Mochi 0.1 ==========");
@@ -318,6 +336,12 @@ void app_main(void)
             vTaskDelay(pdMS_TO_TICKS(10));
             last = esp_timer_get_time();
             continue;
+        }
+
+        /* 挂着但读不了 = 卡假死，30 秒体检一次 */
+        if (sd_ready() && now - last_sd_probe > 30000000) {
+            last_sd_probe = now;
+            sd_health_check();
         }
 
         /* 卡没插好也能救：每 5 秒试着挂一次，插上就自动恢复，不用重启 */

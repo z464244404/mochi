@@ -12,6 +12,8 @@
 #include "dsec.h"
 #include "esp_app_desc.h"
 #include "esp_heap_caps.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
 #include "esp_http_server.h"
 #include "esp_http_client.h"
 #include "esp_log.h"
@@ -377,6 +379,46 @@ static esp_err_t fontpack_put(httpd_req_t *r)
 
 /* url_decode 定义在下面（dfm 那一节），这里先声明，music 要用 */
 static void url_decode(char *s);
+
+/* GET /api/mem —— 资源占用明细（串口没输出时用这个看） */
+extern size_t cover_mem_bytes(void);
+extern size_t fontpack_mem_bytes(void);
+extern int lua_rt_heap_used(void);
+
+static esp_err_t mem_get(httpd_req_t *r)
+{
+    cJSON *j = cJSON_CreateObject();
+    if (!j) return ESP_OK;
+
+    cJSON_AddNumberToObject(j, "heap_int", heap_caps_get_free_size(MALLOC_CAP_INTERNAL));
+    cJSON_AddNumberToObject(j, "heap_dma",
+                            heap_caps_get_free_size(MALLOC_CAP_INTERNAL | MALLOC_CAP_DMA));
+    cJSON_AddNumberToObject(j, "int_block",
+                            heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL));
+    cJSON_AddNumberToObject(j, "psram", heap_caps_get_free_size(MALLOC_CAP_SPIRAM));
+    cJSON_AddNumberToObject(j, "psram_block",
+                            heap_caps_get_largest_free_block(MALLOC_CAP_SPIRAM));
+    cJSON_AddNumberToObject(j, "lua", lua_rt_heap_used());
+
+    /* 我们自己的几块大缓冲 */
+    cJSON_AddNumberToObject(j, "cover", cover_mem_bytes());
+    cJSON_AddNumberToObject(j, "fontpack", fontpack_mem_bytes());
+    cJSON_AddNumberToObject(j, "framebuf", 3 * 480 * 480 * 2);
+    cJSON_AddNumberToObject(j, "fps", mochi_fps());
+
+    /* 任务栈水位（需要 CONFIG_FREERTOS_USE_TRACE_FACILITY） */
+    static TaskStatus_t tasks[24];
+    UBaseType_t n = uxTaskGetSystemState(tasks, 24, NULL);
+    cJSON *arr = cJSON_AddArrayToObject(j, "tasks");
+    for (UBaseType_t i = 0; i < n; i++) {
+        cJSON *t = cJSON_CreateObject();
+        cJSON_AddStringToObject(t, "n", tasks[i].pcTaskName);
+        cJSON_AddNumberToObject(t, "free", (double)tasks[i].usStackHighWaterMark); /* 字节 */
+        cJSON_AddNumberToObject(t, "prio", tasks[i].uxCurrentPriority);
+        cJSON_AddItemToArray(arr, t);
+    }
+    return send_json(r, j);
+}
 
 /* GET /api/shot.bmp —— 把当前帧导成 BMP（浏览器打开就能存图） */
 extern const uint16_t *mochi_last_frame(void);
@@ -897,7 +939,7 @@ esp_err_t web_start(void)
 {
     httpd_config_t cfg = HTTPD_DEFAULT_CONFIG();
     cfg.max_uri_handlers = 32; /* 接口已经 21 个了，20 会静默丢最后一个 */
-    cfg.stack_size = 12288;
+    cfg.stack_size = 10240;
     cfg.max_open_sockets = 4;
     cfg.lru_purge_enable = true;
 
@@ -926,6 +968,7 @@ esp_err_t web_start(void)
     {.uri = "/api/dfm", .method = HTTP_POST, .handler = dfm_post},
     {.uri = "/api/fontpack", .method = HTTP_POST, .handler = fontpack_put},
     {.uri = "/api/shot.bmp", .method = HTTP_GET, .handler = shot_bmp_get},
+    {.uri = "/api/mem", .method = HTTP_GET, .handler = mem_get},
     {.uri = "/api/music", .method = HTTP_POST, .handler = music_post},
     {.uri = "/api/music/cover", .method = HTTP_POST, .handler = music_cover_post},
     };

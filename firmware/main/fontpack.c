@@ -234,3 +234,11 @@ bool fp_glyph(uint32_t cp, int size, mochi_glyph_t *out, const uint8_t **bits)
     *bits = dst;
     return true;
 }
+
+size_t fontpack_mem_bytes(void)
+{
+    size_t n = 0;
+    for (int i = 0; i < s_npacks; i++) n += (size_t)s_packs[i].count * FP_ENT;
+    if (s_cache) n += (size_t)FP_SLOTS * FP_SLOT_PX * FP_SLOT_PX;
+    return n;
+}
