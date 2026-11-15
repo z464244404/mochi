@@ -5,7 +5,8 @@
 --   进度条 x100→380 y378 / 时间 基线404 22px，左贴100、右贴380
 -- ui.text 的 y 是「竖直中心」：29px 基线 = y+11，22px 基线 = y+8.5
 local t = 0
-local title, artist, pos, dur, playing, ts
+local title, artist = "", ""   -- 初值必须是空串，nil 会让 ui.measure 报错
+local pos, dur, playing, ts
 local angle = 0
 local SPEED = 25           -- 播放时转速：度/秒（360/25 ≈ 14.4 秒一圈）
 local bgname = "music-vinyl"

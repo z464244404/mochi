@@ -479,6 +479,18 @@ static esp_err_t shot_bmp_get(httpd_req_t *r)
     return ESP_OK;
 }
 
+/* POST /api/sdformat —— 把 TF 卡重新格式化成 FAT（FAT 表写坏时的自救）
+ * 注意：会清空卡上所有文件，插件/素材/字库都得重新来一遍。 */
+static esp_err_t sdformat_post(httpd_req_t *r)
+{
+    bool ok = sd_format();
+    cJSON *j = cJSON_CreateObject();
+    if (!j) return ESP_OK;
+    cJSON_AddBoolToObject(j, "ok", ok);
+    cJSON_AddBoolToObject(j, "mounted", sd_ready());
+    return send_json(r, j);
+}
+
 /* POST /api/music?title=&artist=&pos=&dur=&playing=&ts=
  * 电脑上的 tools/music_sync.py 把系统媒体信息推过来（音乐副屏用） */
 static esp_err_t music_post(httpd_req_t *r)
@@ -969,6 +981,7 @@ esp_err_t web_start(void)
     {.uri = "/api/fontpack", .method = HTTP_POST, .handler = fontpack_put},
     {.uri = "/api/shot.bmp", .method = HTTP_GET, .handler = shot_bmp_get},
     {.uri = "/api/mem", .method = HTTP_GET, .handler = mem_get},
+    {.uri = "/api/sdformat", .method = HTTP_POST, .handler = sdformat_post},
     {.uri = "/api/music", .method = HTTP_POST, .handler = music_post},
     {.uri = "/api/music/cover", .method = HTTP_POST, .handler = music_cover_post},
     };

@@ -9,6 +9,9 @@
 esp_err_t sd_mount(void);
 bool sd_ready(void);
 void sd_mark_failed(void);
+
+/* 卸载 + 格式化 + 重挂（会清空卡） */
+bool sd_format(void);
 void sd_bench(void);
 
 /**

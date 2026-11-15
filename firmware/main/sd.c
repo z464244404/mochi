@@ -42,7 +42,7 @@ esp_err_t sd_mount(void)
 
     esp_vfs_fat_sdmmc_mount_config_t mcfg = {
         .format_if_mount_failed = false,
-        .max_files = 4,
+        .max_files = 16, /* 桌宠/图标/背景/两套字库常驻打开，4 个句柄不够 */
         .allocation_unit_size = 16 * 1024,
     };
 
@@ -60,7 +60,9 @@ esp_err_t sd_mount(void)
     slot.flags |= SDMMC_SLOT_FLAG_INTERNAL_PULLUP;
 
     /* 先高速试，不行就降频——线长/卡体差异会让 40MHz 起来不来 */
-    static const int freqs[] = {SDMMC_FREQ_HIGHSPEED, SDMMC_FREQ_DEFAULT, 10000};
+    /* 卡座/走线边际时，写比读更容易出错：直接从一开始就用低速，
+     * 20MHz 对这块卡足够（实测读 1MB/s 级），换稳定性。 */
+    static const int freqs[] = {20000000, 10000000, 400000};
     esp_err_t err = ESP_FAIL;
     for (size_t fi = 0; fi < sizeof(freqs) / sizeof(freqs[0]); fi++) {
         host.max_freq_khz = freqs[fi];
@@ -125,4 +127,44 @@ void sd_bench(void)
     free(buf);
     ESP_LOGI(TAG, "read bench: %u KB in %.1f ms = %.2f MB/s", (unsigned)(total / 1024),
              (t1 - t0) / 1000.0, (float)total / (float)(t1 - t0));
+}
+
+/* 卸载 + 重新挂载并强制格式化（FAT）。失败时返回 false，卡保持未挂载。 */
+bool sd_format(void)
+{
+    if (s_card) {
+        esp_vfs_fat_sdmmc_unmount();
+        s_card = NULL;
+    }
+    s_ok = false;
+
+    esp_vfs_fat_sdmmc_mount_config_t mcfg = {
+        .format_if_mount_failed = true, /* 关键：挂不上就格式化 */
+        .max_files = 16, /* 桌宠/图标/背景/两套字库常驻打开，4 个句柄不够 */
+        .allocation_unit_size = 16 * 1024,
+    };
+
+    sdmmc_host_t host = SDMMC_HOST_DEFAULT();
+    host.slot = SDMMC_HOST_SLOT_1;
+    host.max_freq_khz = SDMMC_FREQ_DEFAULT;
+
+    sdmmc_slot_config_t slot = SDMMC_SLOT_CONFIG_DEFAULT();
+    slot.clk = GPIO_NUM_2;
+    slot.cmd = GPIO_NUM_1;
+    slot.d0 = GPIO_NUM_42;
+    slot.d1 = GPIO_NUM_NC;
+    slot.d2 = GPIO_NUM_NC;
+    slot.d3 = GPIO_NUM_NC;
+    slot.width = 1;
+    slot.flags |= SDMMC_SLOT_FLAG_INTERNAL_PULLUP;
+
+    ESP_LOGW(TAG, "格式化 TF 卡…");
+    esp_err_t err = esp_vfs_fat_sdmmc_mount("/sdcard", &host, &slot, &mcfg, &s_card);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "格式化失败: %s", esp_err_to_name(err));
+        return false;
+    }
+    s_ok = true;
+    ESP_LOGI(TAG, "格式化完成，已重新挂载");
+    return true;
 }
