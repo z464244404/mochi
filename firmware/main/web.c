@@ -89,6 +89,9 @@ static esp_err_t status_get(httpd_req_t *r)
     cJSON_AddNumberToObject(j, "fps", mochi_fps());
     cJSON_AddNumberToObject(j, "heap", esp_get_free_heap_size());
     cJSON_AddNumberToObject(j, "psram", heap_caps_get_free_size(MALLOC_CAP_SPIRAM));
+    cJSON_AddNumberToObject(j, "font", fp_count());
+    cJSON_AddNumberToObject(j, "font29", fp_count_px(29));
+    cJSON_AddNumberToObject(j, "font22", fp_count_px(22));
 
     const char *st = "idle";
     switch (net_sta_state()) {

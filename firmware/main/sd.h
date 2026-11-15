@@ -8,6 +8,7 @@
 /* 挂载 TF 卡到 /sdcard（SDMMC 1-bit） */
 esp_err_t sd_mount(void);
 bool sd_ready(void);
+void sd_mark_failed(void);
 void sd_bench(void);
 
 /**

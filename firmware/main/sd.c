@@ -21,8 +21,21 @@ static bool s_ok;
  * 1-bit SD 模式不需要 CS，但 D3 必须为高，卡才不会在上电时进 SPI 模式。
  * GPIO1/2 和屏幕初始化用的 SPI 共用，所以必须先 lcd_init() 再挂卡。
  */
+/* 写失败时调用：把卡标记成不可用，让主循环去重挂 */
+void sd_mark_failed(void)
+{
+    s_ok = false;
+}
+
 esp_err_t sd_mount(void)
 {
+    if (s_ok) return ESP_OK;
+    /* 上次可能还挂着（卡异常但 VFS 没卸），先清一下 */
+    if (s_card) {
+        esp_vfs_fat_sdmmc_unmount();
+        s_card = NULL;
+    }
+
     io_exio_set(EXIO_SD_D3, 1);
     ESP_LOGI(TAG, "EXIO shadow=0x%02x (D3=%d)", io_exio_state(),
              (io_exio_state() >> (EXIO_SD_D3 - 1)) & 1);
@@ -88,6 +101,8 @@ FILE *sd_open_write(const char *path, int tries)
         vTaskDelay(pdMS_TO_TICKS(100));
     }
     ESP_LOGE(TAG, "open for write failed: %s", path);
+    /* 连续打不开 = 卡挂了，标记失效让主循环重挂，别一直卡在这 */
+    sd_mark_failed();
     return NULL;
 }
 
