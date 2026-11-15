@@ -1,3 +1,5 @@
+**中文** · [English](hardware.en.md)
+
 # 硬件
 
 板子：**微雪 ESP32-S3-LCD-2.8C**（ESP32-S3-WROOM-1-N16R8）。

@@ -1,3 +1,5 @@
+**中文** · [English](architecture.en.md)
+
 # Mochi 架构设计
 
 > 一块 480×480 圆屏 + ESP32-S3，做成桌面上「活着」的小东西：

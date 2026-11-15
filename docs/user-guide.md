@@ -1,3 +1,5 @@
+**中文** · [English](user-guide.en.md)
+
 # 使用手册
 
 面向「拿到板子的人」，不涉及代码。想写插件看 [plugin-guide.md](plugin-guide.md)。

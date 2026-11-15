@@ -1,3 +1,5 @@
+**中文** · [English](README_EN.md)
+
 # Mochi · 桌面表情摆件
 
 一块 **ESP32-S3-LCD-2.8C**（480×480 圆屏 + 六轴 IMU + RTC + TF 卡）做成桌面上会「活着」的小东西：

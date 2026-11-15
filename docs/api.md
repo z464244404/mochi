@@ -1,3 +1,5 @@
+**中文** · [English](api.en.md)
+
 # HTTP API
 
 设备自己就是一台 web 服务器（esp_http_server），网页后台调的就是这些接口，

@@ -1,3 +1,5 @@
+**中文** · [English](screenshots.en.md)
+
 # 截图
 
 ## 实拍
