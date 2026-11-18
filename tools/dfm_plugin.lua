@@ -9,7 +9,7 @@ local function fmt(n)
   local a = math.abs(n)
   if a >= 100000000 then return string.format("%.2f亿", n / 100000000) end
   if a >= 10000 then return string.format("%.1f万", n / 10000) end
-  return string.format("%d", n)
+  return string.format("%d", math.floor(n + 0.5))
 end
 
 local function signed(n)

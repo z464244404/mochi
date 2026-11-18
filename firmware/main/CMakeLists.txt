@@ -37,8 +37,8 @@ target_compile_options(${COMPONENT_LIB} PRIVATE
     -fno-trapping-math
 )
 
-# 临时：把余额轮询缩到 20 秒，并让桌宠 30/60 秒自动切动画，验证用
-# target_compile_definitions(${COMPONENT_LIB} PRIVATE DSEC_FAST_TEST)
+# 临时：让桌宠 30/60 秒自动切动画（吃饭/工作/睡觉），仅截图用
+target_compile_definitions(${COMPONENT_LIB} PRIVATE DSEC_FAST_TEST)
 
 # 素材包（pet.mjp / work.mjp / sleep.mjp / icons.bin / bg.bin）烧到 assets 分区，
 # 设备开机时 assets_sync() 只把「大小不一致」的文件写到 TF 卡，写完把分区擦掉。
@@ -46,3 +46,4 @@ target_compile_options(${COMPONENT_LIB} PRIVATE
 if(EXISTS "${CMAKE_CURRENT_LIST_DIR}/../assets/assets.bin")
     esptool_py_flash_to_partition(flash "assets" "${CMAKE_CURRENT_LIST_DIR}/../assets/assets.bin")
 endif()
+

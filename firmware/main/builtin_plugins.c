@@ -337,7 +337,7 @@ static const char *DFM_LUA =
     "  local a = math.abs(n)\n"
     "  if a >= 100000000 then return string.format(\"%.2f亿\", n / 100000000) end\n"
     "  if a >= 10000 then return string.format(\"%.1f万\", n / 10000) end\n"
-    "  return string.format(\"%d\", n)\n"
+    "  return string.format(\"%d\", math.floor(n + 0.5))\n"
     "end\n"
     "\n"
     "local function signed(n)\n"
