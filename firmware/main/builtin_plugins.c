@@ -522,12 +522,14 @@ static const char *MUSIC_MANIFEST =
     "{\n"
     "  \"id\": \"music\",\n"
     "  \"name\": \"音乐\",\n"
-    "  \"version\": \"1.1.0\",\n"
+    "  \"version\": \"1.2.0\",\n"
     "  \"api\": 1,\n"
     "  \"author\": \"mochi\",\n"
     "  \"settings\": [\n"
     "    {\"key\": \"bg\", \"label\": \"背景\", \"type\": \"select\",\n"
     "     \"options\": [\"vinyl\", \"neon\", \"sunset\", \"mint\", \"ocean\"], \"default\": \"vinyl\"},\n"
+    "    {\"key\": \"spin\", \"label\": \"封面旋转\", \"type\": \"select\",\n"
+    "     \"options\": [\"on\", \"off\"], \"default\": \"on\"},\n"
     "    {\"key\": \"hint\", \"label\": \"数据来源\", \"type\": \"text\",\n"
     "     \"default\": \"电脑上运行 python tools/music_sync.py\"}\n"
     "  ]\n"
@@ -547,6 +549,7 @@ static const char *MUSIC_LUA =
     "local angle = 0\n"
     "local SPEED = 25           -- 播放时转速：度/秒（360/25 ≈ 14.4 秒一圈）\n"
     "local bgname = \"music-vinyl\"\n"
+    "local spin = true          -- 封面是否旋转（插件详情可关）\n"
     "\n"
     "local GREEN = 0x5BE0BD\n"
     "local GREY = 0x5A6270\n"
@@ -597,6 +600,7 @@ static const char *MUSIC_LUA =
     "  local style = app.get(\"bg\")\n"
     "  if style == nil or style == \"\" then style = \"vinyl\" end\n"
     "  bgname = \"music-\" .. style\n"
+    "  spin = (app.get(\"spin\") or \"on\") ~= \"off\"\n"
     "  read()\n"
     "end\n"
     "\n"
@@ -617,12 +621,12 @@ static const char *MUSIC_LUA =
     "    return\n"
     "  end\n"
     "\n"
-    "  if playing then\n"
+    "  if playing and spin then\n"
     "    angle = angle + dt * SPEED\n"
     "    if angle >= 360 then angle = angle - 360 end\n"
     "  end\n"
     "\n"
-    "  if not ui.cover(240, 150, 240, angle) then\n"
+    "  if not ui.cover(240, 150, 240, spin and angle or 0) then\n"
     "    ui.circle(240, 150, 120, 0x1A1F27)\n"
     "  end\n"
     "\n"
@@ -710,7 +714,7 @@ static const char *file_content(const builtin_plugin_t *p, const char *name)
 
 static const builtin_plugin_t BUILTINS[] = {
     {"clock", "时钟（cute / tech / minimal）", "1.2.0", CLOCK_FILES},
-    {"music", "音乐", "1.1.0", MUSIC_FILES},
+    {"music", "音乐", "1.2.0", MUSIC_FILES},
     {"bili", "哔哩哔哩", "1.3.0", BILI_FILES},
     {"dfm", "三角洲", "2.0.0", DFM_FILES},
     {"weather", "天气（实时 + 未来三天）", "2.5.1", WEATHER_FILES},

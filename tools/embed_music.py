@@ -13,12 +13,14 @@ DST = os.path.join(ROOT, "firmware", "main", "builtin_plugins.c")
 MANIFEST = """{
   "id": "music",
   "name": "音乐",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "api": 1,
   "author": "mochi",
   "settings": [
     {"key": "bg", "label": "背景", "type": "select",
      "options": ["vinyl", "neon", "sunset", "mint", "ocean"], "default": "vinyl"},
+    {"key": "spin", "label": "封面旋转", "type": "select",
+     "options": ["on", "off"], "default": "on"},
     {"key": "hint", "label": "数据来源", "type": "text",
      "default": "电脑上运行 python tools/music_sync.py"}
   ]

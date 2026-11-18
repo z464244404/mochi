@@ -10,6 +10,7 @@ local pos, dur, playing, ts
 local angle = 0
 local SPEED = 25           -- 播放时转速：度/秒（360/25 ≈ 14.4 秒一圈）
 local bgname = "music-vinyl"
+local spin = true          -- 封面是否旋转（插件详情可关）
 
 local GREEN = 0x5BE0BD
 local GREY = 0x5A6270
@@ -60,6 +61,7 @@ function on_start()
   local style = app.get("bg")
   if style == nil or style == "" then style = "vinyl" end
   bgname = "music-" .. style
+  spin = (app.get("spin") or "on") ~= "off"
   read()
 end
 
@@ -80,12 +82,12 @@ function on_draw(dt)
     return
   end
 
-  if playing then
+  if playing and spin then
     angle = angle + dt * SPEED
     if angle >= 360 then angle = angle - 360 end
   end
 
-  if not ui.cover(240, 150, 240, angle) then
+  if not ui.cover(240, 150, 240, spin and angle or 0) then
     ui.circle(240, 150, 120, 0x1A1F27)
   end
 

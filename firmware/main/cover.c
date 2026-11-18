@@ -102,9 +102,14 @@ bool cover_draw_rot(gfx_t *g, int cx, int cy, int size, float deg)
     int r = size / 2;
     if (r <= 0) return false;
 
-    float scale = (float)s_side / (float)size;
+    /* 源坐标用 8.8 定点（最大 240*256 = 61440，不会溢出）：
+     * 每行的起点用一次浮点算，之后逐像素只做整数加法。 */
+    float sc = (float)s_side / (float)size;
     float a = deg * 3.14159265f / 180.0f;
     float ca = cosf(a), sa = sinf(a);
+    const float half_src = (float)s_side * 0.5f;
+    const int32_t step_x = (int32_t)(ca * sc * 256.0f);
+    const int32_t step_y = (int32_t)(-sa * sc * 256.0f);
 
     for (int dy = -r; dy < r; dy++) {
         int y = cy + dy;
@@ -116,18 +121,23 @@ bool cover_draw_rot(gfx_t *g, int cx, int cy, int size, float deg)
         if (x1 > g->w) x1 = g->w;
         if (x0 >= x1) continue;
 
-        uint16_t *dst = &g->px[(size_t)y * g->w];
+        float dx = (float)(x0 - cx);
         float dyf = (float)dy;
+        int32_t sxf = (int32_t)(((dx * ca + dyf * sa) * sc + half_src) * 256.0f);
+        int32_t syf = (int32_t)(((-dx * sa + dyf * ca) * sc + half_src) * 256.0f);
+
+        uint16_t *dst = &g->px[(size_t)y * g->w];
 
         for (int x = x0; x < x1; x++) {
-            float dx = (float)(x - cx);
-            /* 反向旋转：目标点映射回原图 */
-            float sxf = dx * ca + dyf * sa;
-            float syf = -dx * sa + dyf * ca;
-            int sx = (int)((sxf + r) * scale);
-            int sy = (int)((syf + r) * scale);
-            if (sx < 0 || sx >= s_side || sy < 0 || sy >= s_side) continue;
+            /* 圆内接于方形，采样点必然落在源图内；只有四舍五入的边角可能越界一像素，
+             * 用钳制代替分支判断，少一次跳转。 */
+            int sx = sxf >> 8;
+            int sy = syf >> 8;
+            sx = sx < 0 ? 0 : (sx >= s_side ? s_side - 1 : sx);
+            sy = sy < 0 ? 0 : (sy >= s_side ? s_side - 1 : sy);
             dst[x] = s_px[(size_t)sy * s_side + sx];
+            sxf += step_x;
+            syf += step_y;
         }
     }
     return true;

@@ -12,7 +12,9 @@ static const char *TAG = "fontpack";
 #define FP_MAX 2
 #define FP_ENT 20
 #define FP_SLOT_PX 48
-#define FP_SLOTS 12
+/* 12 个槽太小：一行中文就 20+ 个不同字形，缓存会被冲垮，
+ * 每帧都回 SD 读 => 帧率掉到 20。96 槽约 216KB PSRAM，够放三四行。 */
+#define FP_SLOTS 96
 
 typedef struct {
     FILE *f;

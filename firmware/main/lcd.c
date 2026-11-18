@@ -148,7 +148,7 @@ static esp_err_t backlight_init(void)
         .speed_mode = BL_LEDC_MODE,
         .duty_resolution = BL_LEDC_RES,
         .timer_num = BL_LEDC_TIMER,
-        .freq_hz = 5000,
+        .freq_hz = 20000, /* 5kHz 时低亮度有些面板看得出闪 */
         .clk_cfg = LEDC_AUTO_CLK,
     };
     ESP_RETURN_ON_ERROR(ledc_timer_config(&timer), TAG, "ledc timer");
@@ -335,9 +335,28 @@ esp_lcd_panel_handle_t lcd_panel(void)
     return s_panel;
 }
 
+/* 正在扫描输出的那块，绝对不能往里画，否则就是撕裂/闪烁。
+ * 画面越复杂单帧越慢，轮转指针就越容易追上正在显示的那块 —— 所以必须显式避开。 */
+static int s_show_idx = -1;
+
+static int fb_index(const uint16_t *fb)
+{
+    for (int i = 0; i < s_nfb; i++) {
+        if (s_fbs[i] == fb) return i;
+    }
+    return -1;
+}
+
 uint16_t *lcd_begin_frame(void)
 {
     if (s_nfb < 2) return NULL;
+    for (int k = 0; k < s_nfb; k++) {
+        int idx = (s_write_idx + k) % s_nfb;
+        if (idx == s_show_idx) continue; /* 这一块正显示着，跳过 */
+        s_write_idx = (idx + 1) % s_nfb;
+        return s_fbs[idx];
+    }
+    /* 全被占用（理论上不会），退化成原来的行为 */
     uint16_t *p = s_fbs[s_write_idx];
     s_write_idx = (s_write_idx + 1) % s_nfb;
     return p;
@@ -348,6 +367,8 @@ void lcd_end_frame(uint16_t *fb)
     if (!s_panel || !fb) return;
     /* 当缓冲就是驱动自己的帧缓冲时，esp_lcd 只切换显示指针，不做拷贝 */
     esp_lcd_panel_draw_bitmap(s_panel, 0, 0, LCD_H_RES, LCD_V_RES, fb);
+    int idx = fb_index(fb);
+    if (idx >= 0) s_show_idx = idx;
 }
 
 int lcd_fb_count(void)
