@@ -661,12 +661,136 @@ static const char *MUSIC_LUA =
     "end\n"
     ;
 
+static const char *PC_MANIFEST =
+    "{\n"
+    "  \"id\": \"pc\",\n"
+    "  \"name\": \"电脑\",\n"
+    "  \"version\": \"1.0.0\",\n"
+    "  \"api\": 1,\n"
+    "  \"author\": \"mochi\",\n"
+    "  \"settings\": [\n"
+    "    {\"key\": \"hint\", \"label\": \"数据来源\", \"type\": \"text\",\n"
+    "     \"default\": \"电脑上运行 python tools/pc_monitor.py\"}\n"
+    "  ]\n"
+    "}\n"
+    ;
+
+static const char *PC_LUA =
+    "-- 电脑状态：CPU 仪表环 + 内存 / 音量 / 网速 / 开机时长\n"
+    "-- 数据由电脑上的 tools/pc_monitor.py 每秒推过来（纯内存，不写卡）\n"
+    "local cpu, mem, up, down, vol, mute, host, up_sec = 0, 0, 0, 0, 0, false, \"\", 0\n"
+    "local has = false\n"
+    "\n"
+    "local CPX, CPY, CR = 240, 190, 126\n"
+    "local A0, SWEEP = 140, 260      -- 弧从 140° 顺时针扫 260°\n"
+    "\n"
+    "local function read()\n"
+    "  local s = sys.get()\n"
+    "  if not s then\n"
+    "    has = false\n"
+    "    return false\n"
+    "  end\n"
+    "  has = true\n"
+    "  host = s.host or \"\"\n"
+    "  cpu = tonumber(s.cpu) or 0\n"
+    "  mem = tonumber(s.mem) or 0\n"
+    "  up = tonumber(s.up) or 0\n"
+    "  down = tonumber(s.down) or 0\n"
+    "  vol = tonumber(s.vol) or 0\n"
+    "  mute = s.mute and true or false\n"
+    "  up_sec = tonumber(s.up_sec) or 0\n"
+    "  return true\n"
+    "end\n"
+    "\n"
+    "local function speed(v)\n"
+    "  if v >= 10 then return string.format(\"%.0f\", v) end\n"
+    "  if v >= 1 then return string.format(\"%.1f\", v) end\n"
+    "  return string.format(\"%.2f\", v)\n"
+    "end\n"
+    "\n"
+    "local function level_color(p)\n"
+    "  if p >= 85 then return 0xFF5C5C end\n"
+    "  if p >= 60 then return 0xFF9F43 end\n"
+    "  return 0x5BE0BD\n"
+    "end\n"
+    "\n"
+    "local function fmt_uptime(sec)\n"
+    "  local d = math.floor(sec / 86400)\n"
+    "  local h = math.floor(sec % 86400 / 3600)\n"
+    "  local m = math.floor(sec % 3600 / 60)\n"
+    "  if d > 0 then return string.format(\"%d 天 %d 时\", d, h) end\n"
+    "  if h > 0 then return string.format(\"%d 时 %d 分\", h, m) end\n"
+    "  return string.format(\"%d 分\", m)\n"
+    "end\n"
+    "\n"
+    "function on_start()\n"
+    "  read()\n"
+    "end\n"
+    "\n"
+    "local function draw_idle()\n"
+    "  ui.ring(240, 196, CR, 2, 0x2C3542)\n"
+    "  ui.text(\"等待电脑数据\", 240, 320, 29, 0x6B7785)\n"
+    "  ui.text(\"电脑上运行 pc_monitor.py\", 240, 362, 22, 0x4E5A68)\n"
+    "end\n"
+    "\n"
+    "function on_draw(dt)\n"
+    "  read()\n"
+    "  ui.clear(0x090B10)\n"
+    "\n"
+    "  if not has then\n"
+    "    draw_idle()\n"
+    "    return\n"
+    "  end\n"
+    "\n"
+    "  -- CPU 仪表环\n"
+    "  local col = level_color(cpu)\n"
+    "  ui.arc(CPX, CPY, CR, 12, A0, A0 + SWEEP, 0x222A36)\n"
+    "  if cpu > 0.5 then\n"
+    "    ui.arc(CPX, CPY, CR, 12, A0, A0 + SWEEP * math.min(cpu, 100) / 100, col)\n"
+    "  end\n"
+    "\n"
+    "  -- 中央大数字\n"
+    "  local txt = string.format(\"%d\", math.floor(cpu + 0.5))\n"
+    "  local w = ui.measure(txt, 106)\n"
+    "  ui.text(txt, CPX - 10, CPY - 2, 106, col)\n"
+    "  ui.text(\"%\", CPX - 10 + w * 0.5 + 20, CPY + 30, 29, 0x7E8C9C)\n"
+    "  ui.text(\"CPU\", CPX, CPY + 72, 22, 0x6B7785)\n"
+    "\n"
+    "  -- 主机名\n"
+    "  if host ~= \"\" then\n"
+    "    ui.text(host, 240, 34, 22, 0x8A96A4)\n"
+    "  end\n"
+    "\n"
+    "  -- 音量（左） / 内存（右）\n"
+    "  local vtxt\n"
+    "  if mute then\n"
+    "    vtxt = \"音量 静音\"\n"
+    "  else\n"
+    "    vtxt = string.format(\"音量 %.0f%%\", vol)\n"
+    "  end\n"
+    "  ui.text(vtxt, 116, 352, 22, 0xB9C6D4)\n"
+    "  ui.text(string.format(\"内存 %.0f%%\", mem), 364, 352, 22, level_color(mem))\n"
+    "\n"
+    "  -- 网速\n"
+    "  ui.text(\"↑ \" .. speed(up) .. \" M/s\", 118, 392, 22, 0x54B8FF)\n"
+    "  ui.text(\"↓ \" .. speed(down) .. \" M/s\", 362, 392, 22, 0x54B8FF)\n"
+    "\n"
+    "  -- 开机时长\n"
+    "  ui.text(\"开机 \" .. fmt_uptime(up_sec), 240, 428, 22, 0x5E6B7A)\n"
+    "end\n"
+    ;
+
 static const builtin_file_t CLOCK_FILES[] = {
     {"manifest.json", NULL},
     {"main.lua", NULL},
 };
 
 static const builtin_file_t MUSIC_FILES[] = {
+    {"manifest.json", NULL},
+    {"main.lua", NULL},
+};
+
+static const builtin_file_t PC_FILES[] = {
     {"manifest.json", NULL},
     {"main.lua", NULL},
 };
@@ -697,6 +821,10 @@ static const char *file_content(const builtin_plugin_t *p, const char *name)
         if (!strcmp(name, "manifest.json")) return MUSIC_MANIFEST;
         if (!strcmp(name, "main.lua")) return MUSIC_LUA;
     }
+    if (!strcmp(p->id, "pc")) {
+        if (!strcmp(name, "manifest.json")) return PC_MANIFEST;
+        if (!strcmp(name, "main.lua")) return PC_LUA;
+    }
     if (!strcmp(p->id, "bili")) {
         if (!strcmp(name, "manifest.json")) return BILI_MANIFEST;
         if (!strcmp(name, "main.lua")) return BILI_LUA;
@@ -715,6 +843,7 @@ static const char *file_content(const builtin_plugin_t *p, const char *name)
 static const builtin_plugin_t BUILTINS[] = {
     {"clock", "时钟（cute / tech / minimal）", "1.2.0", CLOCK_FILES},
     {"music", "音乐", "1.2.0", MUSIC_FILES},
+    {"pc", "电脑", "1.0.0", PC_FILES},
     {"bili", "哔哩哔哩", "1.3.0", BILI_FILES},
     {"dfm", "三角洲", "2.0.0", DFM_FILES},
     {"weather", "天气（实时 + 未来三天）", "2.5.1", WEATHER_FILES},

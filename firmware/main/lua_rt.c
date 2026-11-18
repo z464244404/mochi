@@ -17,6 +17,7 @@
 #include "bg.h"
 #include "cover.h"
 #include "music_state.h"
+#include "pc_state.h"
 #include "lauxlib.h"
 #include "lua.h"
 #include "lualib.h"
@@ -431,6 +432,39 @@ static const luaL_Reg music_funcs[] = {
     {NULL, NULL},
 };
 
+/* sys.get() —— 电脑状态（pc_monitor.py 推过来的，纯内存） */
+static int l_sys_get(lua_State *L_)
+{
+    const pc_state_t *p = pc_get();
+    if (!p) {
+        lua_pushnil(L_);
+        return 1;
+    }
+    lua_createtable(L_, 0, 8);
+    lua_pushstring(L_, p->host);
+    lua_setfield(L_, -2, "host");
+    lua_pushnumber(L_, p->cpu);
+    lua_setfield(L_, -2, "cpu");
+    lua_pushnumber(L_, p->mem);
+    lua_setfield(L_, -2, "mem");
+    lua_pushnumber(L_, p->up);
+    lua_setfield(L_, -2, "up");
+    lua_pushnumber(L_, p->down);
+    lua_setfield(L_, -2, "down");
+    lua_pushnumber(L_, p->vol);
+    lua_setfield(L_, -2, "vol");
+    lua_pushboolean(L_, p->mute);
+    lua_setfield(L_, -2, "mute");
+    lua_pushinteger(L_, (lua_Integer)p->up_sec);
+    lua_setfield(L_, -2, "up_sec");
+    return 1;
+}
+
+static const luaL_Reg sys_funcs[] = {
+    {"get", l_sys_get},
+    {NULL, NULL},
+};
+
 static const luaL_Reg ui_funcs[] = {
     {"clear", l_clear},   {"rect", l_rect},     {"round_rect", l_round_rect},
     {"circle", l_circle}, {"ring", l_ring},     {"arc", l_arc},
@@ -696,6 +730,9 @@ static void register_api(lua_State *L_)
 
     luaL_newlib(L_, app_funcs);
     lua_setglobal(L_, "app");
+
+    luaL_newlib(L_, sys_funcs);
+    lua_setglobal(L_, "sys");
 
     luaL_newlib(L_, music_funcs);
     lua_setglobal(L_, "music");

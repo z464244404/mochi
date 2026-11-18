@@ -25,6 +25,7 @@
 #include "sd.h"
 #include "fontpack.h"
 #include "music_state.h"
+#include "pc_state.h"
 #include "www.h"
 
 static const char *TAG = "web";
@@ -489,6 +490,41 @@ static esp_err_t sdformat_post(httpd_req_t *r)
     cJSON_AddBoolToObject(j, "ok", ok);
     cJSON_AddBoolToObject(j, "mounted", sd_ready());
     return send_json(r, j);
+}
+
+/* POST /api/pc?host=&cpu=&mem=&up=&down=&vol=&mute=&up_sec=
+ * 电脑状态每秒推一次，只写内存。 */
+static esp_err_t pc_post(httpd_req_t *r)
+{
+    char host[48] = "", cpu[16] = "0", mem[16] = "0", up[16] = "0";
+    char down[16] = "0", vol[16] = "0", mute[8] = "0", up_sec[24] = "0";
+
+    query(r, "host", host, sizeof(host));
+    query(r, "cpu", cpu, sizeof(cpu));
+    query(r, "mem", mem, sizeof(mem));
+    query(r, "up", up, sizeof(up));
+    query(r, "down", down, sizeof(down));
+    query(r, "vol", vol, sizeof(vol));
+    query(r, "mute", mute, sizeof(mute));
+    query(r, "up_sec", up_sec, sizeof(up_sec));
+    url_decode(host);
+
+    pc_state_t st;
+    memset(&st, 0, sizeof(st));
+    snprintf(st.host, sizeof(st.host), "%s", host);
+    st.cpu = (float)atof(cpu);
+    st.mem = (float)atof(mem);
+    st.up = (float)atof(up);
+    st.down = (float)atof(down);
+    st.vol = (float)atof(vol);
+    st.mute = (mute[0] == '1');
+    st.up_sec = (int64_t)atoll(up_sec);
+    pc_set(&st);
+
+    cJSON *res = cJSON_CreateObject();
+    if (!res) return ESP_OK;
+    cJSON_AddBoolToObject(res, "ok", true);
+    return send_json(r, res);
 }
 
 /* POST /api/music?title=&artist=&pos=&dur=&playing=&ts=
@@ -981,6 +1017,7 @@ esp_err_t web_start(void)
     {.uri = "/api/fontpack", .method = HTTP_POST, .handler = fontpack_put},
     {.uri = "/api/shot.bmp", .method = HTTP_GET, .handler = shot_bmp_get},
     {.uri = "/api/mem", .method = HTTP_GET, .handler = mem_get},
+    {.uri = "/api/pc", .method = HTTP_POST, .handler = pc_post},
     {.uri = "/api/sdformat", .method = HTTP_POST, .handler = sdformat_post},
     {.uri = "/api/music", .method = HTTP_POST, .handler = music_post},
     {.uri = "/api/music/cover", .method = HTTP_POST, .handler = music_cover_post},
