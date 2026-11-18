@@ -331,6 +331,17 @@ void gfx_polyline(gfx_t *g, const float *pts, int n, float thick, uint32_t argb)
     }
 }
 
+/* 弧：按行填环带 + 叉积判角度。
+ * 原来是每 2° 画一段粗线，每段都要按包围盒逐像素算距离，
+ * 重叠 8~10 倍，一条 260° 的仪表环要 30ms。现在每行只算两个 sqrt。 */
+static inline bool arc_inside(float dx, float dy, float v0x, float v0y,
+                              float v1x, float v1y, bool minor)
+{
+    /* 顺时针扫过 [a0,a1]，方向向量夹角用叉积判断，免 atan2 */
+    bool in = (v0x * dy - v0y * dx) >= 0.0f && (dx * v1y - dy * v1x) >= 0.0f;
+    return minor ? in : !in;
+}
+
 void gfx_arc(gfx_t *g, float cx, float cy, float r, float thick, float a0, float a1, uint32_t argb)
 {
     if (a1 < a0) {
@@ -339,19 +350,56 @@ void gfx_arc(gfx_t *g, float cx, float cy, float r, float thick, float a0, float
         a1 = t;
     }
     float span = a1 - a0;
-    int segs = (int)(span / 2.0f);
-    if (segs < 1) segs = 1;
-    if (segs > 180) segs = 180;
+    if (span <= 0.0f) return;
 
-    float prev_x = cx + cosf(a0 * 0.0174532925f) * r;
-    float prev_y = cy + sinf(a0 * 0.0174532925f) * r;
-    for (int i = 1; i <= segs; i++) {
-        float a = (a0 + span * i / segs) * 0.0174532925f;
-        float x = cx + cosf(a) * r;
-        float y = cy + sinf(a) * r;
-        gfx_line(g, prev_x, prev_y, x, y, thick, argb);
-        prev_x = x;
-        prev_y = y;
+    const float D2R = 0.0174532925f;
+    float ro = r + thick * 0.5f;
+    float ri = r - thick * 0.5f;
+    if (ri < 0) ri = 0;
+
+    bool full = span >= 359.0f;
+    bool minor = span <= 180.0f;
+    float v0x = 0, v0y = 0, v1x = 0, v1y = 0;
+    if (!full) {
+        /* span > 180 时用补集判断：把边界换成交集更小的那段 */
+        float b0 = minor ? a0 : a1;
+        float b1 = minor ? a1 : a0 + 360.0f;
+        v0x = cosf(b0 * D2R);
+        v0y = sinf(b0 * D2R);
+        v1x = cosf(b1 * D2R);
+        v1y = sinf(b1 * D2R);
+    }
+
+    int y0 = (int)floorf(cy - ro);
+    int y1 = (int)ceilf(cy + ro);
+    if (y0 < 0) y0 = 0;
+    if (y1 > g->h) y1 = g->h;
+
+    for (int y = y0; y < y1; y++) {
+        float dy = y + 0.5f - cy;
+        float xo2 = ro * ro - dy * dy;
+        if (xo2 <= 0) continue;
+        float xo = sqrtf(xo2);
+        float xi = 0;
+        if (dy > -ri && dy < ri) {
+            float xi2 = ri * ri - dy * dy;
+            if (xi2 > 0) xi = sqrtf(xi2);
+        }
+
+        /* 右半 + 左半分别填 */
+        for (int side = 0; side < 2; side++) {
+            float x_from = side ? -xo : xi;
+            float x_to = side ? -xi : xo;
+            int px0 = (int)floorf(cx + x_from);
+            int px1 = (int)ceilf(cx + x_to);
+            if (px0 < 0) px0 = 0;
+            if (px1 > g->w) px1 = g->w;
+            for (int x = px0; x < px1; x++) {
+                float dx = x + 0.5f - cx;
+                if (!full && !arc_inside(dx, dy, v0x, v0y, v1x, v1y, minor)) continue;
+                put(g, x, y, argb, 255);
+            }
+        }
     }
 }
 
