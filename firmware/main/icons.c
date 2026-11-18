@@ -13,12 +13,15 @@ static const char *TAG = "icons";
 #define ENTRY_LEN (NAME_LEN + 24)
 #define MAX_SIDE 128
 #define MAX_FRAMES 16
-#define NSLOT 4
+/* 天气一屏要 4 个不同图标（大图标 @120 + 3 个小图标 @64），
+ * 4 个槽刚好互斥，每帧都在驱逐 => 每帧回 SD 重读。给到 8 个。 */
+#define NSLOT 8
 #define PACK_PATH "/sdcard/icons.bin"
 
 typedef struct {
     char key[NAME_LEN + 8];
     uint8_t *frames;
+    size_t cap;          /* 已分配的字节数，按需增长，不再一上来就 786KB */
     int w, h, nf, delay;
     int64_t t0;
     uint32_t used;
@@ -112,10 +115,19 @@ static slot_t *lookup(const char *key)
         if (nf == 0 || nf > MAX_FRAMES) return NULL;
         if (size != w * h * 3 * nf) return NULL;
 
-        size_t need = MAX_SIDE * MAX_SIDE * 3 * MAX_FRAMES;
-        if (!sl->frames) {
-            sl->frames = heap_caps_malloc(need, MALLOC_CAP_SPIRAM);
-            if (!sl->frames) return NULL;
+        /* 以前固定分配 MAX_SIDE*MAX_SIDE*3*MAX_FRAMES = 786KB/槽，
+         * 天气一次要 4 个图标就是 3MB。按实际尺寸申请，只有不够时才扩。 */
+        if (sl->cap < size) {
+            if (sl->frames) {
+                heap_caps_free(sl->frames);
+                sl->frames = NULL;
+            }
+            sl->frames = heap_caps_malloc(size, MALLOC_CAP_SPIRAM);
+            if (!sl->frames) {
+                sl->cap = 0;
+                return NULL;
+            }
+            sl->cap = size;
         }
         if (fseek(s_f, (long)off, SEEK_SET) != 0) return NULL;
         if (fread(sl->frames, 1, size, s_f) != size) return NULL;

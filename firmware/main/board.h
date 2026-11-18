@@ -41,7 +41,8 @@
 #define PIN_LCD_BL 6
 /* 18MHz 时面板刷新 64.7Hz，PSRAM 带宽被 DMA 吃掉一半；
  * 降到 12MHz ≈ 43Hz，肉眼够用，把带宽让给渲染 */
-#define LCD_PCLK_HZ (12 * 1000 * 1000)
+/* 12MHz 只有 43Hz 刷新，大面积亮画面能看出闪；16MHz ≈ 57.5Hz */
+#define LCD_PCLK_HZ (16 * 1000 * 1000)
 
 /* ---------------- I2C 总线（板载，不可复用） ---------------- */
 #define PIN_I2C_SDA 15

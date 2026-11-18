@@ -268,7 +268,7 @@ esp_err_t lcd_init(void)
         /* 关键：帧缓冲在 PSRAM，CPU 解码时会把 PSRAM 带宽吃满，
          * 直接用 EDMA 从 PSRAM 取数据会断流 → 整屏撕裂。
          * 用 DRAM 里的 bounce buffer 做中转，EDMA 只读内部 RAM。 */
-        .bounce_buffer_size_px = 10 * LCD_H_RES,
+        .bounce_buffer_size_px = 10 * LCD_H_RES, /* 24 行反而更慢，实测 10 行最好 */
         .clk_src = LCD_CLK_SRC_DEFAULT,
         .disp_gpio_num = -1,
         .pclk_gpio_num = PIN_LCD_PCLK,
